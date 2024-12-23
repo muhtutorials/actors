@@ -31,7 +31,6 @@ func (r *Response) Result() (any, error) {
 		cancel()
 		r.engine.Registry.Remove(r.pid)
 	}()
-
 	select {
 	case resp := <-r.result:
 		return resp, nil

@@ -89,7 +89,7 @@ func (c *Context) Send(pid *PID, msg any) {
 	c.engine.SendWithSender(pid, msg, c.pid)
 }
 
-// SendRepeat will send the given message to the given PID each given interval.
+// SendRepeat will send a message to the given PID each given interval.
 // It will return a SendRepeater struct that can stop the repeating message by calling Stop().
 func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
 	sr := SendRepeater{
