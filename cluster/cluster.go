@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"github.com/muhtutorials/actors/actor"
+	"github.com/muhtutorials/actors/remote"
 	"log/slog"
 	"math"
 	"math/rand"

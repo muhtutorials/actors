@@ -1,2 +1,1 @@
-# protoc -I=../actor --go_out=. --go-vtproto_out=. --go_opt=paths=source_relative  --proto_path=. cluster.proto
-protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative cluster/cluster.proto
+protoc --go_out=. --go_opt=paths=source_relative --go-vtproto_out=. --go-vtproto_opt=paths=source_relative cluster/cluster.proto

@@ -25,7 +25,7 @@ func (pid *PID) Child(id string) *PID {
 	return NewPID(pid.Address, childID)
 }
 
-func (pid *PID) lookupKey() uint64 {
+func (pid *PID) LookupKey() uint64 {
 	key := []byte(pid.Address)
 	key = append(key, pid.ID...)
 	return xxh3.Hash(key)

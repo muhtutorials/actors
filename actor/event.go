@@ -95,7 +95,7 @@ func (e EventEngineRemoteMissing) Log() (slog.Level, string, []any) {
 
 // EventRemoteUnreachable is published when trying to send a message to
 // a remote that is not reachable. The event will be published after we
-// retry to dial it `n` times.
+// retry to dial it "n" times.
 type EventRemoteUnreachable struct {
 	// listen address of the remote we are trying to dial
 	ListenAddr string
