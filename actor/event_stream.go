@@ -5,16 +5,6 @@ import (
 	"log/slog"
 )
 
-// eventSub is the message that will be sent to subscribe to the event stream.
-type eventSub struct {
-	pid *PID
-}
-
-// EventUnsub is the message that will be sent to unsubscribe from the event stream.
-type eventUnsub struct {
-	pid *PID
-}
-
 type eventStream struct {
 	subs map[*PID]bool
 }
@@ -47,4 +37,14 @@ func (e eventStream) Receive(ctx *Context) {
 			ctx.Forward(sub)
 		}
 	}
+}
+
+// eventSub is the message that will be sent to subscribe to the event stream.
+type eventSub struct {
+	pid *PID
+}
+
+// EventUnsub is the message that will be sent to unsubscribe from the event stream.
+type eventUnsub struct {
+	pid *PID
 }

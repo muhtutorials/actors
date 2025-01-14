@@ -126,9 +126,9 @@ func (r *Remote) Stop() *sync.WaitGroup {
 // Sending will work even if the remote is stopped. Receiving, however, will not work.
 func (r *Remote) Send(pid *actor.PID, msg any, sender *actor.PID) {
 	r.engine.Send(r.streamRouterPID, &streamDeliver{
-		target: pid,
-		msg:    msg,
-		sender: sender,
+		target:  pid,
+		message: msg,
+		sender:  sender,
 	})
 }
 

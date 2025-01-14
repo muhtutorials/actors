@@ -18,25 +18,6 @@ const (
 	running
 )
 
-type Scheduler interface {
-	Schedule(func())
-	Throughput() int
-}
-
-type goScheduler int
-
-func (goScheduler) Schedule(fn func()) {
-	go fn()
-}
-
-func (s goScheduler) Throughput() int {
-	return int(s)
-}
-
-func NewScheduler(throughput int) Scheduler {
-	return goScheduler(throughput)
-}
-
 type Inboxer interface {
 	Send(Envelope)
 	Start(Processor)
@@ -44,23 +25,23 @@ type Inboxer interface {
 }
 
 type Inbox struct {
-	rb         *ring_buffer.RingBuffer[Envelope]
+	buf        *ring_buffer.RingBuffer[Envelope]
 	proc       Processor
 	scheduler  Scheduler
 	procStatus atomic.Int32
 }
 
 func NewInbox(size int) *Inbox {
-	in := &Inbox{
-		rb:        ring_buffer.New[Envelope](int64(size)),
+	inbox := &Inbox{
+		buf:       ring_buffer.New[Envelope](int64(size)),
 		scheduler: NewScheduler(defaultThroughput),
 	}
-	in.procStatus.Store(stopped)
-	return in
+	inbox.procStatus.Store(stopped)
+	return inbox
 }
 
 func (in *Inbox) Send(msg Envelope) {
-	in.rb.Push(msg)
+	in.buf.Push(msg)
 	in.schedule()
 }
 
@@ -90,17 +71,36 @@ func (in *Inbox) process() {
 }
 
 func (in *Inbox) run() {
-	i, t := 0, in.scheduler.Throughput()
+	i, throughput := 0, in.scheduler.Throughput()
 	for in.procStatus.Load() != stopped {
-		if i > t {
+		if i > throughput {
 			i = 0
 			runtime.Gosched()
 		}
 		i++
-		if messages, ok := in.rb.PopN(messageBatchSize); ok && len(messages) > 0 {
+		if messages, ok := in.buf.PopN(messageBatchSize); ok {
 			in.proc.Invoke(messages)
 		} else {
 			return
 		}
 	}
+}
+
+type Scheduler interface {
+	Schedule(func())
+	Throughput() int
+}
+
+type goScheduler int
+
+func NewScheduler(throughput int) Scheduler {
+	return goScheduler(throughput)
+}
+
+func (goScheduler) Schedule(fn func()) {
+	go fn()
+}
+
+func (s goScheduler) Throughput() int {
+	return int(s)
 }

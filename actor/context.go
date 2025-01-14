@@ -18,7 +18,7 @@ type Context struct {
 	message  any
 	context  context.Context
 	// The context of the parent if we are a child.
-	// We need this parentCtx, so we can remove the child from the parent Context
+	// We need this parentCtx, so we can remove the child from the parent context
 	// when the child dies.
 	parentCtx *Context
 	children  *safe_map.SafeMap[string, *PID]
@@ -93,9 +93,8 @@ func (c *Context) Send(pid *PID, msg any) {
 // It will return a SendRepeater struct that can stop the repeating message by calling Stop().
 func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
 	sr := SendRepeater{
-		self: c.pid,
-		// todo pid.CloneVT() is used here, but I don't have this method in generated pb files
-		target:   pid,
+		self:     c.pid,
+		target:   pid.CloneVT(),
 		engine:   c.engine,
 		message:  msg,
 		interval: interval,
@@ -114,7 +113,7 @@ func (c *Context) Forward(pid *PID) {
 // GetPID returns the PID of the process found by the given id.
 // Returns nil when it could not find any process.
 func (c *Context) GetPID(id string) *PID {
-	proc := c.engine.Registry.getByID(id)
+	proc := c.engine.registry.GetByID(id)
 	if proc != nil {
 		return proc.PID()
 	}

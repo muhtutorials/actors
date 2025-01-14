@@ -28,8 +28,8 @@ type process struct {
 	pid        *PID
 	context    *Context
 	inbox      Inboxer
-	restarts   int32
 	messageBuf []Envelope
+	restarts   int32
 	Opts
 }
 
@@ -63,7 +63,7 @@ func (p *process) Invoke(msgs []Envelope) {
 	// Number of messages that are processed.
 	nProcessed := 0
 	// FIXME: We could use nProcessed here, but for some reason placing nProcessed++ on the
-	// bottom of the function it freezes some tests. Hence, I created a new counter
+	// bottom of the function freezes some tests. Hence, I created a new counter
 	// for bookkeeping.
 	processed := 0
 	defer func() {
@@ -109,6 +109,8 @@ func (p *process) invokeMessage(msg Envelope) {
 	rcv := p.context.receiver
 	if len(p.Opts.MiddleWare) > 0 {
 		applyMiddleware(rcv.Receive, p.Opts.MiddleWare...)(p.context)
+	} else {
+		rcv.Receive(p.context)
 	}
 }
 
@@ -189,7 +191,7 @@ func (p *process) cleanUp(wg *sync.WaitGroup) {
 		}
 	}
 	_ = p.inbox.Stop()
-	p.context.engine.Registry.Remove(p.pid)
+	p.context.engine.registry.Remove(p.pid)
 	p.context.message = Stopped{}
 	applyMiddleware(p.context.receiver.Receive, p.Opts.MiddleWare...)(p.context)
 	p.context.engine.BroadcastEvent(EventActorStopped{

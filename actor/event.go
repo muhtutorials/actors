@@ -21,7 +21,6 @@ type EventActorStarted struct {
 }
 
 func (e EventActorStarted) Log() (slog.Level, string, []any) {
-	// todo: should it be `e.PID` or `e.PID.GetID()`?
 	return slog.LevelDebug, "Actor started.", []any{"pid", e.PID}
 }
 

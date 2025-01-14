@@ -100,8 +100,8 @@ type Cluster struct {
 // New returns a new cluster given a Config.
 func New(cfg Config) (*Cluster, error) {
 	if cfg.engine == nil {
-		remote := remote.New(remote.NewConfig(), cfg.listenAddr)
-		engine, err := actor.NewEngine(actor.NewEngineConfig(remote))
+		rm := remote.New(cfg.listenAddr, remote.NewConfig())
+		engine, err := actor.NewEngine(actor.NewEngineConfig().WithRemote(rm))
 		if err != nil {
 			return nil, err
 		}

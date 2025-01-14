@@ -20,14 +20,14 @@ type Remoter interface {
 // Producer is a function that can return a Receiver.
 type Producer func() Receiver
 
-// Receiver receives and processes messages.
+// Receiver (actor) receives and processes messages.
 type Receiver interface {
 	Receive(*Context)
 }
 
 // Engine represents the actor engine.
 type Engine struct {
-	Registry    *Registry
+	registry    *Registry
 	address     string
 	remote      Remoter
 	eventStream *PID
@@ -53,7 +53,7 @@ func (cfg EngineConfig) WithRemote(r Remoter) EngineConfig {
 // NewEngine returns a new actor Engine given an EngineConfig.
 func NewEngine(cfg EngineConfig) (*Engine, error) {
 	e := new(Engine)
-	e.Registry = newRegistry(e) // need to init the registry in case we want a custom dead letter
+	e.registry = NewRegistry(e) // need to init the registry in case we want a custom dead letter
 	e.address = LocalLookupAddr
 	if cfg.remote != nil {
 		e.remote = cfg.remote
@@ -62,7 +62,7 @@ func NewEngine(cfg EngineConfig) (*Engine, error) {
 			return nil, fmt.Errorf("failed to start remote: %w", err)
 		}
 	}
-	e.eventStream = e.Spawn(newEventStream(), "event stream")
+	e.eventStream = e.Spawn(newEventStream(), "event_stream")
 	return e, nil
 }
 
@@ -74,9 +74,8 @@ func (e *Engine) Spawn(p Producer, kind string, optFns ...OptFunc) *PID {
 		fn(&opts)
 	}
 	// check if we got an ID, generate otherwise
-	if len(opts.ID) == 0 {
-		id := strconv.Itoa(rand.Intn(math.MaxInt))
-		opts.ID = id
+	if opts.ID == "" {
+		opts.ID = strconv.Itoa(rand.Intn(math.MaxInt))
 	}
 	proc := newProcess(e, opts)
 	return e.SpawnProcess(proc)
@@ -90,7 +89,7 @@ func (e *Engine) SpawnFunc(fn func(*Context), kind string, optFns ...OptFunc) *P
 // SpawnProcess spawns the given Processor. This function is useful when working
 // with custom created processes. Take a look at the streamWriter as an example.
 func (e *Engine) SpawnProcess(p Processor) *PID {
-	e.Registry.add(p)
+	e.registry.Add(p)
 	return p.PID()
 }
 
@@ -106,7 +105,7 @@ func (e *Engine) Address() string {
 // block until the deadline is exceeded or the response is being resolved.
 func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
 	resp := NewResponse(e, timeout)
-	e.Registry.add(resp)
+	e.registry.Add(resp)
 	e.SendWithSender(pid, msg, resp.PID())
 	return resp
 }
@@ -138,6 +137,7 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	}
 	if e.isLocalMessage(pid) {
 		e.SendLocal(pid, msg, sender)
+		return
 	}
 	if e.remote == nil {
 		e.BroadcastEvent(EventEngineRemoteMissing{Target: pid, Sender: sender, Message: msg})
@@ -181,9 +181,8 @@ func (sr SendRepeater) Stop() {
 // It will return a SendRepeater struct that can stop the repeating message by calling Stop().
 func (e *Engine) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
 	sr := SendRepeater{
-		self: nil,
-		// todo *pid.CloneVT() is used here, but I don't have this method in generated pb files
-		target:   pid,
+		self:     nil,
+		target:   pid.CloneVT(),
 		engine:   e,
 		message:  msg,
 		interval: interval,
@@ -202,38 +201,38 @@ func (e *Engine) Stop(pid *PID, wgs ...*sync.WaitGroup) *sync.WaitGroup {
 // Poison will send a graceful poisonPill message to the process that is associated with the given PID.
 // The process will shut down gracefully once it has processed all the messages in the inbox.
 // If given a WaitGroup, it blocks till the process is completely shut down.
-func (e *Engine) Poison(pid *PID, wgs ...*sync.WaitGroup) *sync.WaitGroup {
-	return e.sendPoisonPill(pid, true, wgs...)
+func (e *Engine) Poison(pid *PID, wg ...*sync.WaitGroup) *sync.WaitGroup {
+	return e.sendPoisonPill(pid, true, wg...)
 }
 
-func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wgs ...*sync.WaitGroup) *sync.WaitGroup {
-	wg := new(sync.WaitGroup)
-	if len(wgs) > 0 {
-		wg = wgs[0]
+func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) *sync.WaitGroup {
+	waitGroup := new(sync.WaitGroup)
+	if len(wg) > 0 {
+		waitGroup = wg[0]
 	}
 	pill := poisonPill{
-		wg:       wg,
+		wg:       waitGroup,
 		graceful: graceful,
 	}
-	// if we didn't find a process, we will broadcast a DeadLetterEvent.
-	if e.Registry.get(pid) == nil {
+	// if we didn't find a process, we will broadcast a EventDeadLetter.
+	if e.registry.Get(pid) == nil {
 		e.BroadcastEvent(EventDeadLetter{
 			Target:  pid,
 			Message: pill,
 			Sender:  nil,
 		})
-		return wg
+		return waitGroup
 	}
-	wg.Add(1)
+	waitGroup.Add(1)
 	e.SendLocal(pid, pill, nil)
-	return wg
+	return waitGroup
 }
 
 // SendLocal will send the given message to the given PID. If the recipient is not in the
 // registry, the message will be sent to the DeadLetter process instead. If there is no DeadLetter
 // process registered, the function will panic.
 func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
-	proc := e.Registry.get(pid)
+	proc := e.registry.Get(pid)
 	if proc == nil {
 		e.BroadcastEvent(EventDeadLetter{
 			Target:  pid,

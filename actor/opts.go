@@ -6,11 +6,10 @@ import (
 )
 
 const (
-	defaultInboxSize   = 1024
-	defaultMaxRestarts = 3
+	defaultInboxSize    = 1024
+	defaultMaxRestarts  = 3
+	defaultRestartDelay = 500 * time.Millisecond
 )
-
-var defaultRestartDelay = 500 * time.Millisecond
 
 type ReceiveFunc = func(*Context)
 
