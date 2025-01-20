@@ -16,7 +16,7 @@ type streamReader struct {
 func newStreamReader(r *Remote) *streamReader {
 	return &streamReader{
 		remote:       r,
-		deserializer: ProtoSerializer{},
+		deserializer: ProtoSerde{},
 	}
 }
 
@@ -28,13 +28,14 @@ func (r *streamReader) Receive(stream DRPCRemote_ReceiveStream) error {
 			if errors.Is(err, context.Canceled) {
 				break
 			}
+			slog.Error("streamReader.Receive:", "err", err)
+			return err
 		}
-		slog.Error("stream reader receive", "err", err)
 		for _, msg := range envelope.Messages {
 			typeName := envelope.TypeNames[msg.TypeNameIndex]
 			payload, err := r.deserializer.Deserialize(msg.Data, typeName)
 			if err != nil {
-				slog.Error("stream reader deserialize", "err", err)
+				slog.Error("streamReader.deserialize:", "err", err)
 				return err
 			}
 			target := envelope.Targets[msg.TargetIndex]

@@ -92,7 +92,7 @@ func (c *Context) Send(pid *PID, msg any) {
 // SendRepeat will send a message to the given PID each given interval.
 // It will return a SendRepeater struct that can stop the repeating message by calling Stop().
 func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
-	sr := SendRepeater{
+	r := SendRepeater{
 		self:     c.pid,
 		target:   pid.CloneVT(),
 		engine:   c.engine,
@@ -100,8 +100,8 @@ func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepe
 		interval: interval,
 		cancelCh: make(chan struct{}, 1),
 	}
-	sr.start()
-	return sr
+	r.start()
+	return r
 }
 
 // Forward will forward the current received message to the given PID.
@@ -110,10 +110,10 @@ func (c *Context) Forward(pid *PID) {
 	c.engine.SendWithSender(pid, c.message, c.pid)
 }
 
-// GetPID returns the PID of the process found by the given id.
+// GetProcPID returns the PID of the process found by the given id.
 // Returns nil when it could not find any process.
-func (c *Context) GetPID(id string) *PID {
-	proc := c.engine.registry.GetByID(id)
+func (c *Context) GetProcPID(id string) *PID {
+	proc := c.engine.Registry.GetByID(id)
 	if proc != nil {
 		return proc.PID()
 	}

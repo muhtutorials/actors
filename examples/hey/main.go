@@ -35,6 +35,13 @@ func main() {
 		log.Fatal(err)
 	}
 	pid := engine.Spawn(newTerminator, "cyborg")
+	engine.SpawnFunc(func(c *actor.Context) {
+		switch msg := c.Message().(type) {
+		case actor.Started:
+			fmt.Println("started")
+			_ = msg
+		}
+	}, "foo")
 	engine.Send(pid, message{data: "I'll be back!"})
 	engine.Poison(pid).Wait()
 }

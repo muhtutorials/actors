@@ -44,11 +44,15 @@ func newProcess(e *Engine, opts Opts) *process {
 	}
 }
 
-func applyMiddleware(receiveFunc ReceiveFunc, middleware ...MiddlewareFunc) ReceiveFunc {
-	for i := len(middleware) - 1; i >= 0; i-- {
-		receiveFunc = middleware[i](receiveFunc)
+func (p *process) receive() {
+	receiveFunc := p.context.receiver.Receive
+	mwLen := len(p.Opts.MiddleWare)
+	if mwLen > 0 {
+		for i := mwLen - 1; i >= 0; i-- {
+			receiveFunc = p.Opts.MiddleWare[i](receiveFunc)
+		}
 	}
-	return receiveFunc
+	receiveFunc(p.context)
 }
 
 func (p *process) PID() *PID { return p.pid }
@@ -71,7 +75,7 @@ func (p *process) Invoke(msgs []Envelope) {
 		// so we can retry them on the next restart.
 		if v := recover(); v != nil {
 			p.context.message = Stopped{}
-			p.context.receiver.Receive(p.context)
+			p.receive()
 			p.messageBuf = make([]Envelope, nMessages-nProcessed)
 			for i := 0; i < nMessages-nProcessed; i++ {
 				p.messageBuf[i] = msgs[i+nProcessed]
@@ -100,18 +104,13 @@ func (p *process) Invoke(msgs []Envelope) {
 }
 
 func (p *process) invokeMessage(msg Envelope) {
-	// Suppress poison pill messages here. they're private to the actor engine.
+	// Suppress poison pill messages here. They're private to the actor engine.
 	if _, ok := msg.Message.(poisonPill); ok {
 		return
 	}
 	p.context.sender = msg.Sender
 	p.context.message = msg.Message
-	rcv := p.context.receiver
-	if len(p.Opts.MiddleWare) > 0 {
-		applyMiddleware(rcv.Receive, p.Opts.MiddleWare...)(p.context)
-	} else {
-		rcv.Receive(p.context)
-	}
+	p.receive()
 }
 
 func (p *process) Start() {
@@ -125,13 +124,13 @@ func (p *process) Start() {
 		}
 	}()
 	p.context.message = Initialized{}
-	applyMiddleware(rcv.Receive, p.Opts.MiddleWare...)(p.context)
+	p.receive()
 	p.context.engine.BroadcastEvent(EventActorInitialized{
 		PID:       p.pid,
 		Timestamp: time.Now(),
 	})
 	p.context.message = Started{}
-	applyMiddleware(rcv.Receive, p.Opts.MiddleWare...)(p.context)
+	p.receive()
 	p.context.engine.BroadcastEvent(EventActorStarted{
 		PID:       p.pid,
 		Timestamp: time.Now(),
@@ -191,9 +190,9 @@ func (p *process) cleanUp(wg *sync.WaitGroup) {
 		}
 	}
 	_ = p.inbox.Stop()
-	p.context.engine.registry.Remove(p.pid)
+	p.context.engine.Registry.Remove(p.pid)
 	p.context.message = Stopped{}
-	applyMiddleware(p.context.receiver.Receive, p.Opts.MiddleWare...)(p.context)
+	p.receive()
 	p.context.engine.BroadcastEvent(EventActorStopped{
 		PID: p.pid, Timestamp: time.Now(),
 	})

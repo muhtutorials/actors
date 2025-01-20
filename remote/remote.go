@@ -13,12 +13,12 @@ import (
 	"sync/atomic"
 )
 
-// Config holds the remote configuration.
+// Config holds remote's configuration.
 type Config struct {
 	TLSConfig *tls.Config
 }
 
-// NewConfig returns a new default remote configuration.
+// NewConfig returns a new default remote's configuration.
 func NewConfig() Config {
 	return Config{}
 }
@@ -65,24 +65,24 @@ func (r *Remote) Start(e *actor.Engine) error {
 	r.state.Store(stateRunning)
 	r.engine = e
 	var (
-		lis net.Listener
-		err error
+		listener net.Listener
+		err      error
 	)
 	if r.config.TLSConfig == nil {
-		lis, err = net.Listen("tcp", r.addr)
+		listener, err = net.Listen("tcp", r.addr)
 	} else {
 		slog.Debug("remote using TLS for listening")
-		lis, err = tls.Listen("tcp", r.addr, r.config.TLSConfig)
+		listener, err = tls.Listen("tcp", r.addr, r.config.TLSConfig)
 	}
 	if err != nil {
 		return fmt.Errorf("remote failed to listen: %w", err)
 	}
-	slog.Debug("listening", "addr", r.addr)
+	slog.Debug("remote listening", "addr", r.addr)
 	mux := drpcmux.New()
 	if err = DRPCRegisterRemote(mux, newStreamReader(r)); err != nil {
 		return fmt.Errorf("failed to register remote: %w", err)
 	}
-	s := drpcserver.New(mux)
+	server := drpcserver.New(mux)
 	r.streamRouterPID = r.engine.Spawn(
 		newStreamRouter(r.engine, r.config.TLSConfig),
 		"router",
@@ -95,7 +95,7 @@ func (r *Remote) Start(e *actor.Engine) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		defer r.stopWG.Done()
-		if err = s.Serve(ctx, lis); err != nil {
+		if err = server.Serve(ctx, listener); err != nil {
 			slog.Error("DRPC server", "err", err)
 		} else {
 			slog.Debug("DRPC server stopped")

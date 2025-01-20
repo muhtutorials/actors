@@ -37,7 +37,7 @@ func newStreamWriter(routerPID *actor.PID, addr string, cfg *tls.Config, e *acto
 		routerPID:   routerPID,
 		writeToAddr: addr,
 		tlsConfig:   cfg,
-		serializer:  ProtoSerializer{},
+		serializer:  ProtoSerde{},
 		engine:      e,
 		inbox:       actor.NewInbox(streamWriterBatchSize),
 	}

@@ -25,17 +25,17 @@ type VTUnmarshaler interface {
 	UnmarshalVT([]byte) error
 }
 
-type ProtoSerializer struct{}
+type ProtoSerde struct{}
 
-func (ProtoSerializer) Serialize(msg any) ([]byte, error) {
+func (ProtoSerde) Serialize(msg any) ([]byte, error) {
 	return proto.Marshal(msg.(proto.Message))
 }
 
-func (ProtoSerializer) TypeName(msg any) string {
+func (ProtoSerde) TypeName(msg any) string {
 	return string(proto.MessageName(msg.(proto.Message)))
 }
 
-func (ProtoSerializer) Deserialize(data []byte, typeName string) (any, error) {
+func (ProtoSerde) Deserialize(data []byte, typeName string) (any, error) {
 	name := protoreflect.FullName(typeName)
 	messageType, err := protoregistry.GlobalTypes.FindMessageByName(name)
 	if err != nil {
@@ -45,17 +45,19 @@ func (ProtoSerializer) Deserialize(data []byte, typeName string) (any, error) {
 	return protoMessage, proto.Unmarshal(data, protoMessage)
 }
 
-type VTProtoSerializer struct{}
+// todo: delete if not used
 
-func (VTProtoSerializer) TypeName(msg any) string {
-	return string(proto.MessageName(msg.(proto.Message)))
-}
+type VTProtoSerde struct{}
 
-func (VTProtoSerializer) Serialize(msg any) ([]byte, error) {
+func (VTProtoSerde) Serialize(msg any) ([]byte, error) {
 	return msg.(VTMarshaler).MarshalVT()
 }
 
-func (VTProtoSerializer) Deserialize(data []byte, typeName string) (any, error) {
+func (VTProtoSerde) TypeName(msg any) string {
+	return string(proto.MessageName(msg.(proto.Message)))
+}
+
+func (VTProtoSerde) Deserialize(data []byte, typeName string) (any, error) {
 	v, err := GetType(typeName)
 	if err != nil {
 		return nil, err

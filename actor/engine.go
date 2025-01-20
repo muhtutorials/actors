@@ -11,10 +11,10 @@ import (
 
 // Remoter abstracts a remote that's tied to an engine.
 type Remoter interface {
-	Address() string
-	Send(*PID, any, *PID)
 	Start(*Engine) error
 	Stop() *sync.WaitGroup
+	Send(*PID, any, *PID)
+	Address() string
 }
 
 // Producer is a function that can return a Receiver.
@@ -27,7 +27,7 @@ type Receiver interface {
 
 // Engine represents the actor engine.
 type Engine struct {
-	registry    *Registry
+	Registry    *Registry
 	address     string
 	remote      Remoter
 	eventStream *PID
@@ -53,7 +53,7 @@ func (cfg EngineConfig) WithRemote(r Remoter) EngineConfig {
 // NewEngine returns a new actor Engine given an EngineConfig.
 func NewEngine(cfg EngineConfig) (*Engine, error) {
 	e := new(Engine)
-	e.registry = NewRegistry(e) // need to init the registry in case we want a custom dead letter
+	e.Registry = NewRegistry(e) // need to init the registry in case we want a custom dead letter
 	e.address = LocalLookupAddr
 	if cfg.remote != nil {
 		e.remote = cfg.remote
@@ -89,7 +89,7 @@ func (e *Engine) SpawnFunc(fn func(*Context), kind string, optFns ...OptFunc) *P
 // SpawnProcess spawns the given Processor. This function is useful when working
 // with custom created processes. Take a look at the streamWriter as an example.
 func (e *Engine) SpawnProcess(p Processor) *PID {
-	e.registry.Add(p)
+	e.Registry.Add(p)
 	return p.PID()
 }
 
@@ -105,7 +105,7 @@ func (e *Engine) Address() string {
 // block until the deadline is exceeded or the response is being resolved.
 func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
 	resp := NewResponse(e, timeout)
-	e.registry.Add(resp)
+	e.Registry.Add(resp)
 	e.SendWithSender(pid, msg, resp.PID())
 	return resp
 }
@@ -215,7 +215,7 @@ func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) 
 		graceful: graceful,
 	}
 	// if we didn't find a process, we will broadcast a EventDeadLetter.
-	if e.registry.Get(pid) == nil {
+	if e.Registry.Get(pid) == nil {
 		e.BroadcastEvent(EventDeadLetter{
 			Target:  pid,
 			Message: pill,
@@ -232,7 +232,7 @@ func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) 
 // registry, the message will be sent to the DeadLetter process instead. If there is no DeadLetter
 // process registered, the function will panic.
 func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
-	proc := e.registry.Get(pid)
+	proc := e.Registry.Get(pid)
 	if proc == nil {
 		e.BroadcastEvent(EventDeadLetter{
 			Target:  pid,
@@ -261,6 +261,9 @@ func (e *Engine) isLocalMessage(pid *PID) bool {
 	return e.address == pid.Address
 }
 
+// funcReceiver is used to turn a stateless actor into a producer.
+// "func(*Context)" becomes "Producer".
+// Its usage can be seen inside "Engine.SpawnFunc" method.
 type funcReceiver struct {
 	fn func(*Context)
 }
