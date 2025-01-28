@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	connIdleTimeout       = time.Minute * 10
-	streamWriterBatchSize = 1024
+	connIdleTimeout = time.Minute * 10
+	batchSize       = 1024
 )
 
 type streamWriter struct {
@@ -39,12 +39,27 @@ func newStreamWriter(routerPID *actor.PID, addr string, cfg *tls.Config, e *acto
 		tlsConfig:   cfg,
 		serializer:  ProtoSerde{},
 		engine:      e,
-		inbox:       actor.NewInbox(streamWriterBatchSize),
+		inbox:       actor.NewInbox(batchSize),
 	}
 }
 
-func (s *streamWriter) PID() *actor.PID {
-	return s.pid
+func (s *streamWriter) Start() {
+	s.inbox.Start(s)
+	s.init()
+}
+
+func (s *streamWriter) ShutDown(wg *sync.WaitGroup) {
+	event := actor.EventRemoteUnreachable{ListenAddr: s.writeToAddr}
+	s.engine.Send(s.routerPID, event)
+	s.engine.BroadcastEvent(event)
+	if s.stream != nil {
+		_ = s.stream.Close()
+	}
+	_ = s.inbox.Stop()
+	s.engine.Registry.Remove(s.PID())
+	if wg != nil {
+		wg.Done()
+	}
 }
 
 func (s *streamWriter) Send(_ *actor.PID, msg any, sender *actor.PID) {
@@ -66,23 +81,23 @@ func (s *streamWriter) Invoke(msgs []actor.Envelope) {
 	)
 	for i := 0; i < len(msgs); i++ {
 		var (
-			typeID   int32
-			targetID int32
-			senderID int32
-			stream   = msgs[i].Message.(*streamDeliver)
+			typeNameIndex int32
+			targetIndex   int32
+			senderIndex   int32
+			streamMsg     = msgs[i].Message.(*streamMessage)
 		)
-		typeID, typeNames = LookUpTypeName(typeLookup, s.serializer.TypeName(stream.message), typeNames)
-		targetID, targets = lookUpPIDs(targetLookup, stream.target, targets)
-		senderID, senders = lookUpPIDs(senderLookup, stream.sender, senders)
-		b, err := s.serializer.Serialize(stream.message)
+		typeNameIndex, typeNames = lookUpTypeName(typeLookup, s.serializer.TypeName(streamMsg.message), typeNames)
+		targetIndex, targets = lookUpPID(targetLookup, streamMsg.target, targets)
+		senderIndex, senders = lookUpPID(senderLookup, streamMsg.sender, senders)
+		b, err := s.serializer.Serialize(streamMsg.message)
 		if err != nil {
 			slog.Error("serialize", "err", err)
 			continue
 		}
 		messages[i] = &Message{
-			TypeNameIndex: typeID,
-			TargetIndex:   targetID,
-			SenderIndex:   senderID,
+			TypeNameIndex: typeNameIndex,
+			TargetIndex:   targetIndex,
+			SenderIndex:   senderIndex,
 			Data:          b,
 		}
 		envelope := &Envelope{
@@ -105,23 +120,8 @@ func (s *streamWriter) Invoke(msgs []actor.Envelope) {
 	}
 }
 
-func (s *streamWriter) Start() {
-	s.inbox.Start(s)
-	s.init()
-}
-
-func (s *streamWriter) ShutDown(wg *sync.WaitGroup) {
-	event := actor.EventRemoteUnreachable{ListenAddr: s.writeToAddr}
-	s.engine.Send(s.routerPID, event)
-	s.engine.BroadcastEvent(event)
-	if s.stream != nil {
-		_ = s.stream.Close()
-	}
-	_ = s.inbox.Stop()
-	s.engine.Registry.Remove(s.PID())
-	if wg != nil {
-		wg.Done()
-	}
+func (s *streamWriter) PID() *actor.PID {
+	return s.pid
 }
 
 func (s *streamWriter) init() {
@@ -182,28 +182,28 @@ func (s *streamWriter) init() {
 	}()
 }
 
-func LookUpTypeName(m map[string]int32, name string, types []string) (int32, []string) {
-	maximum := int32(len(m))
-	id, ok := m[name]
+func lookUpTypeName(lookup map[string]int32, typeName string, types []string) (int32, []string) {
+	newIndex := int32(len(lookup))
+	index, ok := lookup[typeName]
 	if !ok {
-		m[name] = maximum
-		id = maximum
-		types = append(types, name)
+		lookup[typeName] = newIndex
+		index = newIndex
+		types = append(types, typeName)
 	}
-	return id, types
+	return index, types
 }
 
-func lookUpPIDs(m map[uint64]int32, pid *actor.PID, pids []*actor.PID) (int32, []*actor.PID) {
+func lookUpPID(lookup map[uint64]int32, pid *actor.PID, pids []*actor.PID) (int32, []*actor.PID) {
 	if pid == nil {
 		return 0, pids
 	}
-	maximum := int32(len(m))
+	newIndex := int32(len(lookup))
 	key := pid.LookupKey()
-	id, ok := m[key]
+	index, ok := lookup[key]
 	if !ok {
-		m[key] = maximum
-		id = maximum
+		lookup[key] = newIndex
+		index = newIndex
 		pids = append(pids, pid)
 	}
-	return id, pids
+	return index, pids
 }

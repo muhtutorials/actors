@@ -50,7 +50,7 @@ type SelfManaged struct {
 	pid          *actor.PID
 	members      *MemberSet
 	membersAlive *MemberSet
-	memberPinger actor.SendRepeater
+	memberPinger actor.SenderAtInterval
 	eventSubPID  *actor.PID
 	resolver     *zeroconf.Resolver
 	announcer    *zeroconf.Server
@@ -96,7 +96,7 @@ func (s *SelfManaged) Receive(ctx *actor.Context) {
 func (s *SelfManaged) handleActorStarted(ctx *actor.Context) {
 	s.pid = ctx.PID()
 	s.members.Add(s.cluster.Member())
-	s.memberPinger = ctx.SendRepeat(ctx.PID(), memberPing{}, memberPingInterval)
+	s.memberPinger = ctx.SendAtInterval(ctx.PID(), memberPing{}, memberPingInterval)
 	s.context, s.cancel = context.WithCancel(context.Background())
 	s.sendMembersToAgent()
 	s.start(ctx)

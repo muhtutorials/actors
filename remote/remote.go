@@ -48,7 +48,6 @@ const (
 	stateStopped
 )
 
-// New creates a new "Remote" object given a "Config".
 func New(addr string, cfg Config) *Remote {
 	r := &Remote{
 		addr:   addr,
@@ -77,7 +76,7 @@ func (r *Remote) Start(e *actor.Engine) error {
 	if err != nil {
 		return fmt.Errorf("remote failed to listen: %w", err)
 	}
-	slog.Debug("remote listening", "addr", r.addr)
+	fmt.Println("remote listening at:", r.addr)
 	mux := drpcmux.New()
 	if err = DRPCRegisterRemote(mux, newStreamReader(r)); err != nil {
 		return fmt.Errorf("failed to register remote: %w", err)
@@ -120,12 +119,12 @@ func (r *Remote) Stop() *sync.WaitGroup {
 	return r.stopWG
 }
 
-// Send sends the given message to the process with the given PID over the network.
-// Optionally, a sender PID can be given to inform the receiving process who sent the
+// Send sends a message to the process with the PID over the network.
+// Optionally, a sender PID can be provided to inform the receiving process who sent the
 // message.
 // Sending will work even if the remote is stopped. Receiving, however, will not work.
 func (r *Remote) Send(pid *actor.PID, msg any, sender *actor.PID) {
-	r.engine.Send(r.streamRouterPID, &streamDeliver{
+	r.engine.Send(r.streamRouterPID, &streamMessage{
 		target:  pid,
 		message: msg,
 		sender:  sender,

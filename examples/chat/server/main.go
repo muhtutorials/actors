@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"github.com/muhtutorials/actors/actor"
@@ -43,6 +43,7 @@ func (s *server) Receive(ctx *actor.Context) {
 				"addr", ctx.Sender().GetAddress(),
 				"id", ctx.Sender().GetID(),
 			)
+			return
 		}
 		s.clients[addr] = ctx.Sender()
 		s.users[addr] = msg.Username
@@ -93,7 +94,7 @@ func (s *server) Receive(ctx *actor.Context) {
 }
 
 func main() {
-	rem := remote.New("127.0.0.1:4000", remote.NewConfig())
+	rem := remote.New("127.0.0.1:3000", remote.NewConfig())
 	engine, err := actor.NewEngine(actor.NewEngineConfig().WithRemote(rem))
 	if err != nil {
 		panic(err)

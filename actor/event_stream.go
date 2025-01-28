@@ -6,13 +6,13 @@ import (
 )
 
 type eventStream struct {
-	subs map[*PID]bool
+	subs map[*PID]struct{}
 }
 
 func newEventStream() Producer {
 	return func() Receiver {
 		return &eventStream{
-			subs: make(map[*PID]bool),
+			subs: make(map[*PID]struct{}),
 		}
 	}
 }
@@ -23,14 +23,14 @@ func newEventStream() Producer {
 func (e eventStream) Receive(ctx *Context) {
 	switch message := ctx.Message().(type) {
 	case eventSub:
-		e.subs[message.pid] = true
+		e.subs[message.pid] = struct{}{}
 	case eventUnsub:
 		delete(e.subs, message.pid)
 	default:
 		// check if we should log the event, if so, log it with the relevant level, message and attributes
-		logMsg, ok := ctx.Message().(EventLogger)
+		eventLogger, ok := ctx.Message().(EventLogger)
 		if ok {
-			level, msg, attrs := logMsg.Log()
+			level, msg, attrs := eventLogger.Log()
 			slog.Log(context.Background(), level, msg, attrs...)
 		}
 		for sub := range e.subs {

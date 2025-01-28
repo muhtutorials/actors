@@ -16,5 +16,5 @@ func GetType(t string) (VTUnmarshaler, error) {
 	if m, ok := registry[t]; ok {
 		return m, nil
 	}
-	return nil, fmt.Errorf("type (%s) is not registered. Make sure to register it with remote.RegisterType(&instance{})", t)
+	return nil, fmt.Errorf("type (%s) is not registered. Make sure to register it with 'remote.RegisterType(&instance{})'", t)
 }

@@ -146,10 +146,10 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	e.remote.Send(pid, msg, sender)
 }
 
-// SendRepeater is a struct that can be used to send a repeating message to a given PID.
-// If you need to have an actor wake up periodically, you can use a SendRepeater.
-// It is started by the SendRepeat method and stopped by Stop method.
-type SendRepeater struct {
+// SenderAtInterval is a struct that can be used to send a message at an interval to a given PID.
+// If you need to have an actor wake up periodically, you can use a SenderAtInterval.
+// It is started by the "SendAtInterval" method and stopped by "Stop" method.
+type SenderAtInterval struct {
 	self     *PID
 	target   *PID
 	engine   *Engine
@@ -158,14 +158,14 @@ type SendRepeater struct {
 	cancelCh chan struct{}
 }
 
-func (sr SendRepeater) start() {
-	ticker := time.NewTicker(sr.interval)
+func (r SenderAtInterval) start() {
+	ticker := time.NewTicker(r.interval)
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
-				sr.engine.SendWithSender(sr.target, sr.message, sr.self)
-			case <-sr.cancelCh:
+				r.engine.SendWithSender(r.target, r.message, r.self)
+			case <-r.cancelCh:
 				ticker.Stop()
 				return
 			}
@@ -173,14 +173,14 @@ func (sr SendRepeater) start() {
 	}()
 }
 
-func (sr SendRepeater) Stop() {
-	close(sr.cancelCh)
+func (r SenderAtInterval) stop() {
+	close(r.cancelCh)
 }
 
-// SendRepeat will send the given message to the given PID each given interval.
-// It will return a SendRepeater struct that can stop the repeating message by calling Stop().
-func (e *Engine) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
-	sr := SendRepeater{
+// SendAtInterval will send a message to a PID at a provided interval.
+// It will return a "SenderAtInterval" struct that can stop the repeated sending of a message by calling "Stop".
+func (e *Engine) SendAtInterval(pid *PID, msg any, interval time.Duration) SenderAtInterval {
+	r := SenderAtInterval{
 		self:     nil,
 		target:   pid.CloneVT(),
 		engine:   e,
@@ -188,8 +188,8 @@ func (e *Engine) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepea
 		interval: interval,
 		cancelCh: make(chan struct{}, 1),
 	}
-	sr.start()
-	return sr
+	r.start()
+	return r
 }
 
 // Stop will send a non-graceful poisonPill message to the process that is associated with the given PID.
@@ -198,9 +198,9 @@ func (e *Engine) Stop(pid *PID, wgs ...*sync.WaitGroup) *sync.WaitGroup {
 	return e.sendPoisonPill(pid, false, wgs...)
 }
 
-// Poison will send a graceful poisonPill message to the process that is associated with the given PID.
+// Poison will send a graceful "poisonPill" message to the process that is associated with the given PID.
 // The process will shut down gracefully once it has processed all the messages in the inbox.
-// If given a WaitGroup, it blocks till the process is completely shut down.
+// If given a "WaitGroup", it blocks till the process is completely shut down.
 func (e *Engine) Poison(pid *PID, wg ...*sync.WaitGroup) *sync.WaitGroup {
 	return e.sendPoisonPill(pid, true, wg...)
 }
@@ -214,7 +214,7 @@ func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) 
 		wg:       waitGroup,
 		graceful: graceful,
 	}
-	// if we didn't find a process, we will broadcast a EventDeadLetter.
+	// if we didn't find the process, we will broadcast an "EventDeadLetter".
 	if e.Registry.Get(pid) == nil {
 		e.BroadcastEvent(EventDeadLetter{
 			Target:  pid,

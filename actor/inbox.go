@@ -19,9 +19,9 @@ const (
 )
 
 type Inboxer interface {
-	Send(Envelope)
 	Start(Processor)
 	Stop() error
+	Send(Envelope)
 }
 
 type Inbox struct {
@@ -40,11 +40,6 @@ func NewInbox(size int) *Inbox {
 	return inbox
 }
 
-func (in *Inbox) Send(msg Envelope) {
-	in.buf.Push(msg)
-	in.schedule()
-}
-
 func (in *Inbox) Start(proc Processor) {
 	// Transition to "starting" and then "idle" to ensure no race condition on in.proc.
 	if in.procStatus.CompareAndSwap(stopped, starting) {
@@ -57,6 +52,11 @@ func (in *Inbox) Start(proc Processor) {
 func (in *Inbox) Stop() error {
 	in.procStatus.Swap(stopped)
 	return nil
+}
+
+func (in *Inbox) Send(msg Envelope) {
+	in.buf.Push(msg)
+	in.schedule()
 }
 
 func (in *Inbox) schedule() {

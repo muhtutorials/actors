@@ -6,7 +6,7 @@ import (
 	"log/slog"
 )
 
-type streamDeliver struct {
+type streamMessage struct {
 	target  *actor.PID
 	message any
 	sender  *actor.PID
@@ -33,16 +33,16 @@ func (s *streamRouter) Receive(ctx *actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case actor.Started:
 		s.pid = ctx.PID()
-	case *streamDeliver:
-		s.deliverStream(msg)
+	case *streamMessage:
+		s.handleStreamMessage(msg)
 	case actor.EventRemoteUnreachable:
 		s.handleTerminateStream(msg)
 	}
 }
 
-func (s *streamRouter) deliverStream(msg *streamDeliver) {
+func (s *streamRouter) handleStreamMessage(msg *streamMessage) {
 	var (
-		swpid *actor.PID
+		swpid *actor.PID // stream writer PID
 		ok    bool
 		addr  = msg.target.Address
 	)

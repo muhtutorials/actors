@@ -47,16 +47,16 @@ func (c *Context) Request(pid *PID, msg any, timeout time.Duration) *Response {
 	return c.engine.Request(pid, msg, timeout)
 }
 
-// Respond will send the given message to the sender of the current received message.
+// Respond will send message to the sender of the current received message.
 func (c *Context) Respond(msg any) {
 	if c.sender == nil {
-		slog.Warn("context got no sender", "func", "Respond", "pid", c.PID())
+		slog.Warn("context has no sender", "method", "actor.Context.Respond", "pid", c.PID())
 		return
 	}
 	c.engine.Send(c.sender, msg)
 }
 
-// SpawnChild will spawn the given Producer as a child of the current Context.
+// SpawnChild will spawn the Producer as a child of the current Context.
 // If the parent process dies, all the children will be automatically shut down gracefully.
 // Hence, all children will receive the Stopped message.
 func (c *Context) SpawnChild(p Producer, name string, optFns ...OptFunc) *PID {
@@ -66,9 +66,8 @@ func (c *Context) SpawnChild(p Producer, name string, optFns ...OptFunc) *PID {
 		fn(&opts)
 	}
 	// check if we got an ID, generate otherwise
-	if len(opts.ID) == 0 {
-		id := strconv.Itoa(rand.Intn(math.MaxInt))
-		opts.ID = id
+	if opts.ID == "" {
+		opts.ID = strconv.Itoa(rand.Intn(math.MaxInt))
 	}
 	proc := newProcess(c.engine, opts)
 	proc.context.parentCtx = c
@@ -77,22 +76,22 @@ func (c *Context) SpawnChild(p Producer, name string, optFns ...OptFunc) *PID {
 	return proc.PID()
 }
 
-// SpawnChildFunc spawns the given function as a child Receiver of the current Context.
+// SpawnChildFunc spawns the function as a child Receiver of the current Context.
 func (c *Context) SpawnChildFunc(fn func(*Context), name string, optFns ...OptFunc) *PID {
 	return c.SpawnChild(newFuncReceiver(fn), name, optFns...)
 }
 
-// Send will send the given message to the given PID. This will also set the sender of the message to
-// the PID of the current Context. Hence, the receiver of the message can call Context.Sender() to know
+// Send will send a message to the PID. This will also set the sender of the message to
+// the PID of the current Context. Hence, the receiver of the message can call "Sender" to know
 // the PID of the process that sent this message.
 func (c *Context) Send(pid *PID, msg any) {
 	c.engine.SendWithSender(pid, msg, c.pid)
 }
 
-// SendRepeat will send a message to the given PID each given interval.
-// It will return a SendRepeater struct that can stop the repeating message by calling Stop().
-func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepeater {
-	r := SendRepeater{
+// SendAtInterval will send a message to a PID at a provided interval.
+// It will return a "SenderAtInterval" struct that can stop the repeated sending of a message by calling "Stop".
+func (c *Context) SendAtInterval(pid *PID, msg any, interval time.Duration) SenderAtInterval {
+	r := SenderAtInterval{
 		self:     c.pid,
 		target:   pid.CloneVT(),
 		engine:   c.engine,
@@ -104,13 +103,13 @@ func (c *Context) SendRepeat(pid *PID, msg any, interval time.Duration) SendRepe
 	return r
 }
 
-// Forward will forward the current received message to the given PID.
+// Forward will forward the current received message to the PID.
 // This will also set the "forwarder" as the sender of the message.
 func (c *Context) Forward(pid *PID) {
 	c.engine.SendWithSender(pid, c.message, c.pid)
 }
 
-// GetProcPID returns the PID of the process found by the given id.
+// GetProcPID returns the PID of the process found by the id.
 // Returns nil when it could not find any process.
 func (c *Context) GetProcPID(id string) *PID {
 	proc := c.engine.Registry.GetByID(id)

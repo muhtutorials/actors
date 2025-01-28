@@ -27,6 +27,7 @@ func (pid *PID) Child(id string) *PID {
 
 func (pid *PID) LookupKey() uint64 {
 	key := []byte(pid.Address)
+	// Converts string "pid.ID" to bytes and appends them to "key".
 	key = append(key, pid.ID...)
 	return xxh3.Hash(key)
 }

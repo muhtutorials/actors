@@ -17,11 +17,11 @@ type Envelope struct {
 
 // Processor is an interface that abstracts the way a process behaves.
 type Processor interface {
-	PID() *PID
-	Send(*PID, any, *PID)
-	Invoke([]Envelope)
 	Start()
 	ShutDown(*sync.WaitGroup)
+	Send(*PID, any, *PID)
+	Invoke([]Envelope)
+	PID() *PID
 }
 
 type process struct {
@@ -44,18 +44,39 @@ func newProcess(e *Engine, opts Opts) *process {
 	}
 }
 
-func (p *process) receive() {
-	receiveFunc := p.context.receiver.Receive
-	mwLen := len(p.Opts.MiddleWare)
-	if mwLen > 0 {
-		for i := mwLen - 1; i >= 0; i-- {
-			receiveFunc = p.Opts.MiddleWare[i](receiveFunc)
+func (p *process) Start() {
+	receiver := p.Producer()
+	p.context.receiver = receiver
+	defer func() {
+		if v := recover(); v != nil {
+			p.context.message = Stopped{}
+			p.receive()
+			p.tryRestart(v)
 		}
+	}()
+	p.context.message = Initialized{}
+	p.receive()
+	p.context.engine.BroadcastEvent(EventActorInitialized{
+		PID:       p.pid,
+		Timestamp: time.Now(),
+	})
+	p.context.message = Started{}
+	p.receive()
+	p.context.engine.BroadcastEvent(EventActorStarted{
+		PID:       p.pid,
+		Timestamp: time.Now(),
+	})
+	// If we have messages in our buffer, invoke them.
+	if len(p.messageBuf) > 0 {
+		p.Invoke(p.messageBuf)
+		p.messageBuf = nil
 	}
-	receiveFunc(p.context)
+	p.inbox.Start(p)
 }
 
-func (p *process) PID() *PID { return p.pid }
+func (p *process) ShutDown(wg *sync.WaitGroup) {
+	p.cleanUp(wg)
+}
 
 func (p *process) Send(_ *PID, msg any, sender *PID) {
 	p.inbox.Send(Envelope{Sender: sender, Message: msg})
@@ -103,44 +124,18 @@ func (p *process) Invoke(msgs []Envelope) {
 	}
 }
 
-func (p *process) invokeMessage(msg Envelope) {
-	// Suppress poison pill messages here. They're private to the actor engine.
-	if _, ok := msg.Message.(poisonPill); ok {
-		return
-	}
-	p.context.sender = msg.Sender
-	p.context.message = msg.Message
-	p.receive()
-}
+func (p *process) PID() *PID { return p.pid }
 
-func (p *process) Start() {
-	rcv := p.Producer()
-	p.context.receiver = rcv
-	defer func() {
-		if v := recover(); v != nil {
-			p.context.message = Stopped{}
-			p.context.receiver.Receive(p.context)
-			p.tryRestart(v)
+func (p *process) receive() {
+	receiveFunc := p.context.receiver.Receive
+	// Apply middleware if there is any.
+	mwLen := len(p.Opts.MiddleWare)
+	if mwLen > 0 {
+		for i := mwLen - 1; i >= 0; i-- {
+			receiveFunc = p.Opts.MiddleWare[i](receiveFunc)
 		}
-	}()
-	p.context.message = Initialized{}
-	p.receive()
-	p.context.engine.BroadcastEvent(EventActorInitialized{
-		PID:       p.pid,
-		Timestamp: time.Now(),
-	})
-	p.context.message = Started{}
-	p.receive()
-	p.context.engine.BroadcastEvent(EventActorStarted{
-		PID:       p.pid,
-		Timestamp: time.Now(),
-	})
-	// If we have messages in our buffer, invoke them.
-	if len(p.messageBuf) > 0 {
-		p.Invoke(p.messageBuf)
-		p.messageBuf = nil
 	}
-	p.inbox.Start(p)
+	receiveFunc(p.context)
 }
 
 func (p *process) tryRestart(v any) {
@@ -155,7 +150,6 @@ func (p *process) tryRestart(v any) {
 		p.Start()
 		return
 	}
-	stackTrace := cleanTrace(debug.Stack())
 	// If we reach the max restarts, we shut down the inbox and clean
 	// everything up.
 	if p.restarts == p.MaxRestarts {
@@ -166,8 +160,9 @@ func (p *process) tryRestart(v any) {
 		p.cleanUp(nil)
 		return
 	}
+	stackTrace := cleanTrace(debug.Stack())
 	p.restarts++
-	// Restart the process after its restartDelay.
+	// Restart the process after its "restartDelay".
 	p.context.engine.BroadcastEvent(EventActorRestarted{
 		PID:        p.pid,
 		Timestamp:  time.Now(),
@@ -194,15 +189,22 @@ func (p *process) cleanUp(wg *sync.WaitGroup) {
 	p.context.message = Stopped{}
 	p.receive()
 	p.context.engine.BroadcastEvent(EventActorStopped{
-		PID: p.pid, Timestamp: time.Now(),
+		PID:       p.pid,
+		Timestamp: time.Now(),
 	})
 	if wg != nil {
 		wg.Done()
 	}
 }
 
-func (p *process) ShutDown(wg *sync.WaitGroup) {
-	p.cleanUp(wg)
+func (p *process) invokeMessage(msg Envelope) {
+	// Suppress poison pill messages here. They're private to the actor engine.
+	if _, ok := msg.Message.(poisonPill); ok {
+		return
+	}
+	p.context.sender = msg.Sender
+	p.context.message = msg.Message
+	p.receive()
 }
 
 func cleanTrace(stack []byte) []byte {
