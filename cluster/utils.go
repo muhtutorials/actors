@@ -2,7 +2,7 @@ package cluster
 
 import "github.com/muhtutorials/actors/actor"
 
-// memberToProviderPID create a new PID from the member that
+// memberToProviderPID creates a new PID from the member that
 // will target the provider actor of the cluster.
 func memberToProvider(m *Member) *actor.PID {
 	return actor.NewPID(m.Host, "provider/"+m.ID)
@@ -25,7 +25,7 @@ func (cid *CID) Equals(other *CID) bool {
 
 // PID returns the cluster PID of where the node agent can be reached.
 func (m *Member) PID() *actor.PID {
-	return actor.NewPID(m.Host, "cluster"+m.ID)
+	return actor.NewPID(m.Host, "cluster/"+m.ID)
 }
 
 func (m *Member) Equals(other *Member) bool {

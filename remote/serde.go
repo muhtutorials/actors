@@ -42,7 +42,8 @@ func (ProtoSerde) Deserialize(data []byte, typeName string) (any, error) {
 		return nil, err
 	}
 	protoMessage := messageType.New().Interface()
-	return protoMessage, proto.Unmarshal(data, protoMessage)
+	err = proto.Unmarshal(data, protoMessage)
+	return protoMessage, err
 }
 
 // todo: delete if not used

@@ -1,6 +1,8 @@
 package actor
 
-import "sync"
+import (
+	"sync"
+)
 
 const LocalLookupAddr = "local"
 
@@ -53,7 +55,8 @@ func (r *Registry) Add(proc Processor) {
 	id := proc.PID().ID
 	if _, ok := r.lookup[id]; ok {
 		r.mu.Unlock()
-		r.engine.BroadcastEvent(EventActorDuplicateID{PID: proc.PID()})
+		r.engine.BroadcastEvent(ActorDuplicateIDEvent{PID: proc.PID()})
+		return
 	}
 	r.lookup[id] = proc
 	r.mu.Unlock()

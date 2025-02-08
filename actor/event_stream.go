@@ -18,13 +18,12 @@ func newEventStream() Producer {
 }
 
 // Receive for the event stream. All system-wide events are sent here.
-// Some events are specially handled, such as eventSub, eventUnsub for subscribing to events,
-// DeadLetterSub, DeadLetterUnsub, for subscribing to EventDeadLetter.
+// Some events are specially handled, such as "subscribeEvent" and "unsubscribeEvent" for subscribing to events.
 func (e eventStream) Receive(ctx *Context) {
 	switch message := ctx.Message().(type) {
-	case eventSub:
+	case subscribeEvent:
 		e.subs[message.pid] = struct{}{}
-	case eventUnsub:
+	case unsubscribeEvent:
 		delete(e.subs, message.pid)
 	default:
 		// check if we should log the event, if so, log it with the relevant level, message and attributes
@@ -39,12 +38,12 @@ func (e eventStream) Receive(ctx *Context) {
 	}
 }
 
-// eventSub is the message that will be sent to subscribe to the event stream.
-type eventSub struct {
+// subscribeEvent is the message that will be sent to subscribe to the event stream.
+type subscribeEvent struct {
 	pid *PID
 }
 
-// EventUnsub is the message that will be sent to unsubscribe from the event stream.
-type eventUnsub struct {
+// unsubscribeEvent is the message that will be sent to unsubscribe from the event stream.
+type unsubscribeEvent struct {
 	pid *PID
 }

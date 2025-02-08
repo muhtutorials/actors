@@ -49,7 +49,7 @@ func (s *streamWriter) Start() {
 }
 
 func (s *streamWriter) ShutDown(wg *sync.WaitGroup) {
-	event := actor.EventRemoteUnreachable{ListenAddr: s.writeToAddr}
+	event := actor.RemoteUnreachableEvent{ListenAddr: s.writeToAddr}
 	s.engine.Send(s.routerPID, event)
 	s.engine.BroadcastEvent(event)
 	if s.stream != nil {
@@ -89,7 +89,7 @@ func (s *streamWriter) Invoke(msgs []actor.Envelope) {
 		typeNameIndex, typeNames = lookUpTypeName(typeLookup, s.serializer.TypeName(streamMsg.message), typeNames)
 		targetIndex, targets = lookUpPID(targetLookup, streamMsg.target, targets)
 		senderIndex, senders = lookUpPID(senderLookup, streamMsg.sender, senders)
-		b, err := s.serializer.Serialize(streamMsg.message)
+		data, err := s.serializer.Serialize(streamMsg.message)
 		if err != nil {
 			slog.Error("serialize", "err", err)
 			continue
@@ -98,7 +98,7 @@ func (s *streamWriter) Invoke(msgs []actor.Envelope) {
 			TypeNameIndex: typeNameIndex,
 			TargetIndex:   targetIndex,
 			SenderIndex:   senderIndex,
-			Data:          b,
+			Data:          data,
 		}
 		envelope := &Envelope{
 			TypeNames: typeNames,

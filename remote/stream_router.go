@@ -35,7 +35,7 @@ func (s *streamRouter) Receive(ctx *actor.Context) {
 		s.pid = ctx.PID()
 	case *streamMessage:
 		s.handleStreamMessage(msg)
-	case actor.EventRemoteUnreachable:
+	case actor.RemoteUnreachableEvent:
 		s.handleTerminateStream(msg)
 	}
 }
@@ -54,7 +54,7 @@ func (s *streamRouter) handleStreamMessage(msg *streamMessage) {
 	s.engine.Send(swpid, msg)
 }
 
-func (s *streamRouter) handleTerminateStream(msg actor.EventRemoteUnreachable) {
+func (s *streamRouter) handleTerminateStream(msg actor.RemoteUnreachableEvent) {
 	streamWriterPID := s.streams[msg.ListenAddr]
 	delete(s.streams, msg.ListenAddr)
 	slog.Debug("stream terminated",

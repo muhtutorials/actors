@@ -25,7 +25,7 @@ type MemberAddr struct {
 	ID         string
 }
 
-type memberLeave struct {
+type memberLeft struct {
 	ListenAddr string
 }
 
@@ -39,8 +39,8 @@ func NewSelfManagedConfig() SelfManagedConfig {
 	return SelfManagedConfig{}
 }
 
-func (c SelfManagedConfig) WithBootstrapMember(m MemberAddr) SelfManagedConfig {
-	c.bootstrapMembers = append(c.bootstrapMembers, m)
+func (c SelfManagedConfig) WithBootstrapMembers(members ...MemberAddr) SelfManagedConfig {
+	c.bootstrapMembers = append(c.bootstrapMembers, members...)
 	return c
 }
 
@@ -81,13 +81,12 @@ func (s *SelfManaged) Receive(ctx *actor.Context) {
 		s.handleHandshake(ctx, msg)
 	case *Members:
 		s.addMembers(msg.Members...)
-	case memberLeave:
-		s.handleMemberLeave(msg)
+	case memberLeft:
+		s.handleMemberLeft(msg)
 	case memberPing:
 		s.handleMemberPing(ctx)
-	case actor.Ping:
+	case *actor.Ping:
 	case actor.Initialized:
-		_ = msg
 	default:
 		slog.Warn("received unhandled message", "msg", msg, "type", reflect.TypeOf(msg))
 	}
@@ -116,7 +115,7 @@ func (s *SelfManaged) handleHandshake(ctx *actor.Context, h *Handshake) {
 	s.cluster.engine.Send(ctx.Sender(), &Members{Members: members})
 }
 
-func (s *SelfManaged) handleMemberLeave(msg memberLeave) {
+func (s *SelfManaged) handleMemberLeft(msg memberLeft) {
 	member := s.members.GetByHost(msg.ListenAddr)
 	s.removeMember(member)
 }
@@ -168,9 +167,9 @@ func (s *SelfManaged) start(ctx *actor.Context) {
 }
 
 func (s *SelfManaged) handleEventStream(ctx *actor.Context) {
-	msg, ok := ctx.Message().(actor.EventRemoteUnreachable)
+	msg, ok := ctx.Message().(actor.RemoteUnreachableEvent)
 	if ok {
-		ctx.Send(s.pid, memberLeave{ListenAddr: msg.ListenAddr})
+		ctx.Send(s.pid, memberLeft{ListenAddr: msg.ListenAddr})
 	}
 }
 
@@ -211,7 +210,7 @@ func (s *SelfManaged) startAutoDiscovery() {
 			if entry.Instance != s.cluster.ID() {
 				host := fmt.Sprintf("%s:%d", entry.AddrIPv4[0], entry.Port)
 				hs := &Handshake{Member: s.cluster.Member()}
-				// create a reachable PID for this member.
+				// create a reachable PID for this member
 				memberPID := actor.NewPID(host, "provider/"+entry.Instance)
 				self := actor.NewPID(s.cluster.agentPID.Address, "provider/"+s.cluster.ID())
 				s.cluster.engine.SendWithSender(memberPID, hs, self)

@@ -89,7 +89,8 @@ func (c *Context) Send(pid *PID, msg any) {
 }
 
 // SendAtInterval will send a message to a PID at a provided interval.
-// It will return a "SenderAtInterval" struct that can stop the repeated sending of a message by calling "Stop".
+// It will return a "SenderAtInterval" struct that can stop the repeated
+// sending of a message by calling "Stop".
 func (c *Context) SendAtInterval(pid *PID, msg any, interval time.Duration) SenderAtInterval {
 	r := SenderAtInterval{
 		self:     c.pid,
@@ -99,7 +100,7 @@ func (c *Context) SendAtInterval(pid *PID, msg any, interval time.Duration) Send
 		interval: interval,
 		cancelCh: make(chan struct{}, 1),
 	}
-	r.start()
+	r.Start()
 	return r
 }
 

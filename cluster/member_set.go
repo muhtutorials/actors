@@ -76,18 +76,19 @@ func (s *MemberSet) FilterByKind(kind string) []*Member {
 	return members
 }
 
-func (s *MemberSet) Except(members []*Member) []*Member {
+// Difference calculates the difference of sets "s.members" and "members".
+func (s *MemberSet) Difference(members []*Member) []*Member {
 	var (
-		except []*Member
-		m      = make(map[string]*Member)
+		diff []*Member
+		m    = make(map[string]*Member)
 	)
 	for _, member := range members {
 		m[member.ID] = member
 	}
 	for _, member := range s.members {
 		if _, ok := m[member.ID]; !ok {
-			except = append(except, member)
+			diff = append(diff, member)
 		}
 	}
-	return except
+	return diff
 }

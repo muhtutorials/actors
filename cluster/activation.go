@@ -49,13 +49,13 @@ func (cfg ActivationConfig) WithSelectMemberFunc(fn SelectMemberFunc) Activation
 // Given the ActivationDetails the actor will be spawned on the returned member.
 type SelectMemberFunc func(ActivationDetails) *Member
 
-// ActivationDetails holds detailed information about an activation.
+// ActivationDetails holds detailed information about activation.
 type ActivationDetails struct {
 	// Region where the actor should be activated.
 	Region string
 	// Kind of actor.
 	Kind string
-	// A slice of members that's pre-filtered by the kind of the actor
+	// A slice of members that's pre-filtered by the kind of actor
 	// that needs to be activated.
 	Members []*Member
 }

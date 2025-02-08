@@ -56,13 +56,13 @@ func (p *process) Start() {
 	}()
 	p.context.message = Initialized{}
 	p.receive()
-	p.context.engine.BroadcastEvent(EventActorInitialized{
+	p.context.engine.BroadcastEvent(ActorInitializedEvent{
 		PID:       p.pid,
 		Timestamp: time.Now(),
 	})
 	p.context.message = Started{}
 	p.receive()
-	p.context.engine.BroadcastEvent(EventActorStarted{
+	p.context.engine.BroadcastEvent(ActorStartedEvent{
 		PID:       p.pid,
 		Timestamp: time.Now(),
 	})
@@ -153,7 +153,7 @@ func (p *process) tryRestart(v any) {
 	// If we reach the max restarts, we shut down the inbox and clean
 	// everything up.
 	if p.restarts == p.MaxRestarts {
-		p.context.engine.BroadcastEvent(EventActorMaxRestartsExceeded{
+		p.context.engine.BroadcastEvent(ActorMaxRestartsExceededEvent{
 			PID:       p.pid,
 			Timestamp: time.Now(),
 		})
@@ -163,7 +163,7 @@ func (p *process) tryRestart(v any) {
 	stackTrace := cleanTrace(debug.Stack())
 	p.restarts++
 	// Restart the process after its "restartDelay".
-	p.context.engine.BroadcastEvent(EventActorRestarted{
+	p.context.engine.BroadcastEvent(ActorRestartedEvent{
 		PID:        p.pid,
 		Timestamp:  time.Now(),
 		Stacktrace: stackTrace,
@@ -188,7 +188,7 @@ func (p *process) cleanUp(wg *sync.WaitGroup) {
 	p.context.engine.Registry.Remove(p.pid)
 	p.context.message = Stopped{}
 	p.receive()
-	p.context.engine.BroadcastEvent(EventActorStopped{
+	p.context.engine.BroadcastEvent(ActorStoppedEvent{
 		PID:       p.pid,
 		Timestamp: time.Now(),
 	})

@@ -140,7 +140,7 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 		return
 	}
 	if e.remote == nil {
-		e.BroadcastEvent(EventEngineRemoteMissing{Target: pid, Sender: sender, Message: msg})
+		e.BroadcastEvent(EngineRemoteMissingEvent{Target: pid, Sender: sender, Message: msg})
 		return
 	}
 	e.remote.Send(pid, msg, sender)
@@ -158,7 +158,7 @@ type SenderAtInterval struct {
 	cancelCh chan struct{}
 }
 
-func (r SenderAtInterval) start() {
+func (r SenderAtInterval) Start() {
 	ticker := time.NewTicker(r.interval)
 	go func() {
 		for {
@@ -173,7 +173,7 @@ func (r SenderAtInterval) start() {
 	}()
 }
 
-func (r SenderAtInterval) stop() {
+func (r SenderAtInterval) Stop() {
 	close(r.cancelCh)
 }
 
@@ -188,7 +188,7 @@ func (e *Engine) SendAtInterval(pid *PID, msg any, interval time.Duration) Sende
 		interval: interval,
 		cancelCh: make(chan struct{}, 1),
 	}
-	r.start()
+	r.Start()
 	return r
 }
 
@@ -214,9 +214,9 @@ func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) 
 		wg:       waitGroup,
 		graceful: graceful,
 	}
-	// if we didn't find the process, we will broadcast an "EventDeadLetter".
+	// if we didn't find the process, we will broadcast an "DeadLetterEvent".
 	if e.Registry.Get(pid) == nil {
-		e.BroadcastEvent(EventDeadLetter{
+		e.BroadcastEvent(DeadLetterEvent{
 			Target:  pid,
 			Message: pill,
 			Sender:  nil,
@@ -234,7 +234,7 @@ func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) 
 func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
 	proc := e.Registry.Get(pid)
 	if proc == nil {
-		e.BroadcastEvent(EventDeadLetter{
+		e.BroadcastEvent(DeadLetterEvent{
 			Target:  pid,
 			Message: msg,
 			Sender:  nil,
@@ -246,12 +246,12 @@ func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
 
 // Subscribe will subscribe the given PID to the event stream.
 func (e *Engine) Subscribe(pid *PID) {
-	e.Send(e.eventStream, eventSub{pid: pid})
+	e.Send(e.eventStream, subscribeEvent{pid: pid})
 }
 
 // Unsubscribe will unsubscribe the given PID from the event stream.
 func (e *Engine) Unsubscribe(pid *PID) {
-	e.Send(e.eventStream, eventUnsub{pid: pid})
+	e.Send(e.eventStream, unsubscribeEvent{pid: pid})
 }
 
 func (e *Engine) isLocalMessage(pid *PID) bool {

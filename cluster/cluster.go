@@ -100,8 +100,8 @@ type Cluster struct {
 // New returns a new cluster given a Config.
 func New(cfg Config) (*Cluster, error) {
 	if cfg.engine == nil {
-		rm := remote.New(cfg.listenAddr, remote.NewConfig())
-		engine, err := actor.NewEngine(actor.NewEngineConfig().WithRemote(rm))
+		rem := remote.New(cfg.listenAddr, remote.NewConfig())
+		engine, err := actor.NewEngine(actor.NewEngineConfig().WithRemote(rem))
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func New(cfg Config) (*Cluster, error) {
 // Start the cluster.
 func (c *Cluster) Start() {
 	c.agentPID = c.engine.Spawn(NewAgent(c), "cluster", actor.WithID(c.config.id))
-	c.providerPID = c.engine.Spawn(c.config.provider(c), "cluster", actor.WithID(c.config.id))
+	c.providerPID = c.engine.Spawn(c.config.provider(c), "provider", actor.WithID(c.config.id))
 	c.isStarted = true
 }
 
@@ -128,17 +128,16 @@ func (c *Cluster) Stop() *sync.WaitGroup {
 	return wg
 }
 
-// Spawn an actor locally on the node with cluster awareness.
+// Spawn spawns an actor locally on the node with cluster awareness.
 func (c *Cluster) Spawn(p actor.Producer, id string, optFns ...actor.OptFunc) *actor.PID {
 	pid := c.engine.Spawn(p, id, optFns...)
-	members := c.Members()
-	for _, member := range members {
+	for _, member := range c.Members() {
 		c.engine.Send(member.PID(), &Activation{PID: pid})
 	}
 	return pid
 }
 
-// Activate actives the registered kind in the cluster based on the given config.
+// Activate activates the registered kind in the cluster based on the given config.
 // The actor does not need to be registered locally on the member if at least one
 // member has that kind registered.
 func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
@@ -153,7 +152,7 @@ func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
 	}
 	pid, ok := resp.(*actor.PID)
 	if !ok {
-		slog.Warn("activation expected response of *actor.PID", "got", reflect.TypeOf(resp))
+		slog.Warn("activation expected response of '*actor.PID'", "got", reflect.TypeOf(resp))
 		return nil
 	}
 	return pid
@@ -164,8 +163,8 @@ func (c *Cluster) Deactivate(pid *actor.PID) {
 	c.engine.Send(c.agentPID, deactivate{pid: pid})
 }
 
-// RegisterKind registers a new actor that can be activated from any member
-// in the cluster.
+// RegisterKind registers a new actor that can be activated from
+// any member in the cluster.
 // NOTE: Kinds can only be registered before the cluster is started.
 func (c *Cluster) RegisterKind(cfg KindConfig, kind string, p actor.Producer) {
 	if c.isStarted {

@@ -23,7 +23,7 @@ type (
 
 type Agent struct {
 	cluster    *Cluster
-	kinds      map[string]bool
+	kinds      map[string]struct{}
 	localKinds map[string]kind
 	members    *MemberSet
 	// All the actors that are available cluster-wide.
@@ -31,10 +31,10 @@ type Agent struct {
 }
 
 func NewAgent(c *Cluster) actor.Producer {
-	kinds := make(map[string]bool)
+	kinds := make(map[string]struct{})
 	localKinds := make(map[string]kind)
 	for _, k := range c.kinds {
-		kinds[k.name] = true
+		kinds[k.name] = struct{}{}
 		localKinds[k.name] = k
 	}
 	return func() actor.Receiver {
@@ -50,8 +50,6 @@ func NewAgent(c *Cluster) actor.Producer {
 
 func (a *Agent) Receive(ctx *actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case actor.Started:
-	case actor.Stopped:
 	case *ActorTopology:
 		a.handleActorTopology(msg)
 	case *Members:
@@ -85,31 +83,34 @@ func (a *Agent) handleActorTopology(msg *ActorTopology) {
 }
 
 func (a *Agent) handleMembers(members []*Member) {
-	joined := NewMemberSet(members...).Except(a.members.Slice())
-	left := a.members.Except(members)
+	joined := NewMemberSet(members...).Difference(a.members.Slice())
+	left := a.members.Difference(members)
 	for _, member := range joined {
-		a.memberJoin(member)
+		a.addMember(member)
 	}
 	for _, member := range left {
-		a.memberLeave(member)
+		a.removeMember(member)
 	}
 }
 
 // A new kind is activated on this cluster.
 func (a *Agent) handleActivation(msg *Activation) {
 	a.addActivated(msg.PID)
-	a.cluster.engine.BroadcastEvent(EventActivation{PID: msg.PID})
+	a.cluster.engine.BroadcastEvent(ActivationEvent{PID: msg.PID})
 }
 
 func (a *Agent) handleDeactivation(msg *Deactivation) {
 	a.removeActivated(msg.PID)
 	a.cluster.engine.Poison(msg.PID)
-	a.cluster.engine.BroadcastEvent(EventDeactivation{PID: msg.PID})
+	a.cluster.engine.BroadcastEvent(DeactivationEvent{PID: msg.PID})
 }
 
 func (a *Agent) handleActivationRequest(msg *ActivationRequest) *ActivationResponse {
 	if !a.hasLocalKind(msg.Kind) {
-		slog.Error("received activation request but kind not registered locally on this node", "kind", msg.Kind)
+		slog.Error(
+			"received activation request but kind not registered locally on this node",
+			"kind", msg.Kind,
+		)
 		return &ActivationResponse{Success: false}
 	}
 	k := a.localKinds[msg.Kind]
@@ -186,25 +187,25 @@ func (a *Agent) removeActivated(pid *actor.PID) {
 	slog.Debug("actor removed from cluster", "pid", pid)
 }
 
-func (a *Agent) memberJoin(member *Member) {
+func (a *Agent) addMember(member *Member) {
 	a.members.Add(member)
 	// Track cluster-wide available kinds.
 	for _, k := range member.Kinds {
 		if _, ok := a.kinds[k]; !ok {
-			a.kinds[k] = true
+			a.kinds[k] = struct{}{}
 		}
 	}
-	var actorInfos []*ActorInfo
+	var actorInfoSlice []*ActorInfo
 	for _, pid := range a.activated {
 		actorInfo := &ActorInfo{PID: pid}
-		actorInfos = append(actorInfos, actorInfo)
+		actorInfoSlice = append(actorInfoSlice, actorInfo)
 	}
-	// Send our ActorTopology to this member
-	if len(actorInfos) > 0 {
-		a.cluster.engine.Send(member.PID(), &ActorTopology{Actors: actorInfos})
+	// Send our "ActorTopology" to this member.
+	if len(actorInfoSlice) > 0 {
+		a.cluster.engine.Send(member.PID(), &ActorTopology{Actors: actorInfoSlice})
 	}
-	// Broadcast EventMemberJoin
-	a.cluster.engine.BroadcastEvent(EventMemberJoin{Member: member})
+	// Broadcast "MemberJoinedEvent"
+	a.cluster.engine.BroadcastEvent(MemberJoinedEvent{Member: member})
 	slog.Debug(
 		"[CLUSTER] member joined",
 		"id", member.ID, "host",
@@ -214,7 +215,7 @@ func (a *Agent) memberJoin(member *Member) {
 	)
 }
 
-func (a *Agent) memberLeave(member *Member) {
+func (a *Agent) removeMember(member *Member) {
 	a.members.Remove(member)
 	a.rebuildKinds()
 	// Remove all the active kinds that were running on the member that left the cluster.
@@ -223,7 +224,7 @@ func (a *Agent) memberLeave(member *Member) {
 			a.removeActivated(pid)
 		}
 	}
-	a.cluster.engine.BroadcastEvent(EventMemberLeave{Member: member})
+	a.cluster.engine.BroadcastEvent(MemberLeftEvent{Member: member})
 	slog.Debug(
 		"[CLUSTER] member left",
 		"id", member.ID, "host",
@@ -238,7 +239,7 @@ func (a *Agent) rebuildKinds() {
 	a.members.ForEach(func(m *Member) bool {
 		for _, k := range m.Kinds {
 			if _, ok := a.kinds[k]; !ok {
-				a.kinds[k] = true
+				a.kinds[k] = struct{}{}
 			}
 		}
 		return true
