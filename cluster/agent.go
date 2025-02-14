@@ -6,21 +6,6 @@ import (
 	"reflect"
 )
 
-type (
-	activate struct {
-		config ActivationConfig
-		kind   string
-	}
-	deactivate struct {
-		pid *actor.PID
-	}
-	getActive struct {
-		id string
-	}
-	getKinds   struct{}
-	getMembers struct{}
-)
-
 type Agent struct {
 	cluster    *Cluster
 	kinds      map[string]struct{}
@@ -61,17 +46,17 @@ func (a *Agent) Receive(ctx *actor.Context) {
 	case *ActivationRequest:
 		resp := a.handleActivationRequest(msg)
 		ctx.Respond(resp)
-	case activate:
-		pid := a.activate(msg.config, msg.kind)
+	case Activate:
+		pid := a.activate(msg.Config, msg.Kind)
 		ctx.Respond(pid)
-	case deactivate:
-		a.broadcast(&Deactivation{PID: msg.pid})
-	case getActive:
-		pid := a.activated[msg.id]
+	case Deactivate:
+		a.broadcast(&Deactivation{PID: msg.PID})
+	case GetActive:
+		pid := a.activated[msg.ID]
 		ctx.Respond(pid)
-	case getKinds:
+	case GetKinds:
 		a.handleGetKinds(ctx)
-	case getMembers:
+	case GetMembers:
 		ctx.Respond(a.members.Slice())
 	}
 }
@@ -106,9 +91,9 @@ func (a *Agent) handleDeactivation(msg *Deactivation) {
 }
 
 func (a *Agent) handleActivationRequest(msg *ActivationRequest) *ActivationResponse {
-	if !a.hasLocalKind(msg.Kind) {
+	if !a.isLocalKind(msg.Kind) {
 		slog.Error(
-			"received activation request but kind not registered locally on this node",
+			"received activation request but kind not registered locally on this cluster",
 			"kind", msg.Kind,
 		)
 		return &ActivationResponse{Success: false}
@@ -127,32 +112,34 @@ func (a *Agent) activate(cfg ActivationConfig, kind string) *actor.PID {
 		slog.Warn("could not find any members with kind", "kind", kind)
 		return nil
 	}
-	if cfg.selectMember == nil {
-		cfg.selectMember = SelectRandomMember
-	}
-	memberPID := cfg.selectMember(ActivationDetails{
+	selectedMember := cfg.selectMember(ActivationDetails{
 		Region:  cfg.region,
 		Members: members,
 	})
-	if memberPID == nil {
+	if selectedMember == nil {
 		slog.Warn("activator did not find a member to activate on")
 		return nil
 	}
 	req := &ActivationRequest{ID: cfg.id, Kind: kind}
-	activatorPID := actor.NewPID(memberPID.Host, "cluster"+memberPID.ID)
+	activatorPID := actor.NewPID(selectedMember.Address, "cluster/"+selectedMember.ID)
 	var activationResp *ActivationResponse
 	// Local activation.
-	if memberPID.Host == a.cluster.engine.Address() {
+	if selectedMember.Address == a.cluster.engine.Address() {
 		activationResp = a.handleActivationRequest(req)
 	} else {
-		resp, err := a.cluster.engine.Request(activatorPID, req, a.cluster.config.requestTimeout).Result()
+		resp, err := a.cluster.engine.
+			Request(activatorPID, req, a.cluster.config.requestTimeout).
+			Result()
 		if err != nil {
 			slog.Error("failed activation request", "err", err)
 			return nil
 		}
 		r, ok := resp.(*ActivationResponse)
 		if !ok {
-			slog.Error("expected `*ActivationResponse`", "msg", reflect.TypeOf(resp))
+			slog.Error(
+				"expected `*ActivationResponse`",
+				"got", reflect.TypeOf(resp),
+			)
 			return nil
 		}
 		if !r.Success {
@@ -204,14 +191,14 @@ func (a *Agent) addMember(member *Member) {
 	if len(actorInfoSlice) > 0 {
 		a.cluster.engine.Send(member.PID(), &ActorTopology{Actors: actorInfoSlice})
 	}
-	// Broadcast "MemberJoinedEvent"
+	// Broadcast "MemberJoinedEvent".
 	a.cluster.engine.BroadcastEvent(MemberJoinedEvent{Member: member})
 	slog.Debug(
 		"[CLUSTER] member joined",
-		"id", member.ID, "host",
-		member.Host, "region",
-		member.Region, "kinds",
-		member.Kinds,
+		"addr", member.Address,
+		"id", member.ID,
+		"region", member.Region,
+		"kinds", member.Kinds,
 	)
 }
 
@@ -220,24 +207,24 @@ func (a *Agent) removeMember(member *Member) {
 	a.rebuildKinds()
 	// Remove all the active kinds that were running on the member that left the cluster.
 	for _, pid := range a.activated {
-		if pid.Address == member.Host {
+		if pid.Address == member.Address {
 			a.removeActivated(pid)
 		}
 	}
 	a.cluster.engine.BroadcastEvent(MemberLeftEvent{Member: member})
 	slog.Debug(
 		"[CLUSTER] member left",
-		"id", member.ID, "host",
-		member.Host, "region",
-		member.Region, "kinds",
-		member.Kinds,
+		"addr", member.Address,
+		"id", member.ID,
+		"region", member.Region,
+		"kinds", member.Kinds,
 	)
 }
 
 func (a *Agent) rebuildKinds() {
 	clear(a.kinds)
-	a.members.ForEach(func(m *Member) bool {
-		for _, k := range m.Kinds {
+	a.members.ForEach(func(member *Member) bool {
+		for _, k := range member.Kinds {
 			if _, ok := a.kinds[k]; !ok {
 				a.kinds[k] = struct{}{}
 			}
@@ -246,7 +233,7 @@ func (a *Agent) rebuildKinds() {
 	})
 }
 
-func (a *Agent) hasLocalKind(name string) bool {
+func (a *Agent) isLocalKind(name string) bool {
 	_, ok := a.localKinds[name]
 	return ok
 }

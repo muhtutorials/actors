@@ -32,9 +32,9 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		listenAddr:     getRandomListenAddr(),
-		id:             fmt.Sprintf("%d", rand.Intn(math.MaxInt)),
+		id:             getRandomID(),
 		region:         "default",
-		provider:       NewSelfManagedProvider(NewSelfManagedConfig()),
+		provider:       NewProvider(NewProviderConfig()),
 		requestTimeout: defaultRequestTimeout,
 	}
 }
@@ -46,7 +46,7 @@ func (cfg Config) WithListenAddr(addr string) Config {
 	return cfg
 }
 
-// WithID sets the ID of this node.
+// WithID sets the ID of this cluster.
 // Defaults to a randomly generated ID.
 func (cfg Config) WithID(id string) Config {
 	cfg.id = id
@@ -61,7 +61,7 @@ func (cfg Config) WithRegion(region string) Config {
 }
 
 // WithEngine sets the internal actor engine that will be used
-// to power the actors running on the node.
+// to power the actors running on the cluster.
 // If no engine is given the cluster will instantiate a new
 // engine and remote.
 func (cfg Config) WithEngine(e *actor.Engine) Config {
@@ -70,7 +70,7 @@ func (cfg Config) WithEngine(e *actor.Engine) Config {
 }
 
 // WithProvider sets the cluster's provider.
-// Defaults to the SelfManagedProvider.
+// Defaults to the Provider.
 func (cfg Config) WithProvider(p Producer) Config {
 	cfg.provider = p
 	return cfg
@@ -128,7 +128,7 @@ func (c *Cluster) Stop() *sync.WaitGroup {
 	return wg
 }
 
-// Spawn spawns an actor locally on the node with cluster awareness.
+// Spawn spawns an actor locally with cluster awareness.
 func (c *Cluster) Spawn(p actor.Producer, id string, optFns ...actor.OptFunc) *actor.PID {
 	pid := c.engine.Spawn(p, id, optFns...)
 	for _, member := range c.Members() {
@@ -141,9 +141,9 @@ func (c *Cluster) Spawn(p actor.Producer, id string, optFns ...actor.OptFunc) *a
 // The actor does not need to be registered locally on the member if at least one
 // member has that kind registered.
 func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
-	msg := activate{
-		config: cfg,
-		kind:   kind,
+	msg := Activate{
+		Config: cfg,
+		Kind:   kind,
 	}
 	resp, err := c.engine.Request(c.agentPID, msg, c.config.requestTimeout).Result()
 	if err != nil {
@@ -160,7 +160,7 @@ func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
 
 // Deactivate deactivates the given PID.
 func (c *Cluster) Deactivate(pid *actor.PID) {
-	c.engine.Send(c.agentPID, deactivate{pid: pid})
+	c.engine.Send(c.agentPID, Deactivate{PID: pid})
 }
 
 // RegisterKind registers a new actor that can be activated from
@@ -174,7 +174,7 @@ func (c *Cluster) RegisterKind(cfg KindConfig, kind string, p actor.Producer) {
 	c.kinds = append(c.kinds, newKind(cfg, kind, p))
 }
 
-// HasLocalKind returns true whether the node of the cluster has the kind locally registered.
+// HasLocalKind returns true whether the cluster has the kind locally registered.
 func (c *Cluster) HasLocalKind(name string) bool {
 	for _, k := range c.kinds {
 		if k.name == name {
@@ -186,7 +186,7 @@ func (c *Cluster) HasLocalKind(name string) bool {
 
 // Members returns all the members that are part of the cluster.
 func (c *Cluster) Members() []*Member {
-	resp, err := c.engine.Request(c.agentPID, getMembers{}, c.config.requestTimeout).Result()
+	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
 	if err != nil {
 		// todo: why was "[]*Member{}" here?
 		return nil
@@ -200,7 +200,7 @@ func (c *Cluster) Members() []*Member {
 // HasKind returns true whether the given kind is available for activation on
 // the cluster.
 func (c *Cluster) HasKind(name string) bool {
-	resp, err := c.engine.Request(c.agentPID, getKinds{}, c.config.requestTimeout).Result()
+	resp, err := c.engine.Request(c.agentPID, GetKinds{}, c.config.requestTimeout).Result()
 	if err != nil {
 		return false
 	}
@@ -215,7 +215,7 @@ func (c *Cluster) HasKind(name string) bool {
 }
 
 func (c *Cluster) GetActivated(id string) *actor.PID {
-	resp, err := c.engine.Request(c.agentPID, getActive{id: id}, c.config.requestTimeout).Result()
+	resp, err := c.engine.Request(c.agentPID, GetActive{ID: id}, c.config.requestTimeout).Result()
 	if err != nil {
 		return nil
 	}
@@ -225,17 +225,17 @@ func (c *Cluster) GetActivated(id string) *actor.PID {
 	return nil
 }
 
-// Member returns the member info of the node.
+// Member returns the member info of the cluster.
 func (c *Cluster) Member() *Member {
 	kinds := make([]string, len(c.kinds))
 	for i := 0; i < len(c.kinds); i++ {
 		kinds[i] = c.kinds[i].name
 	}
 	return &Member{
-		ID:     c.config.id,
-		Host:   c.engine.Address(),
-		Region: c.config.region,
-		Kinds:  kinds,
+		Address: c.engine.Address(),
+		ID:      c.config.id,
+		Region:  c.config.region,
+		Kinds:   kinds,
 	}
 }
 
@@ -249,7 +249,7 @@ func (c *Cluster) PID() *actor.PID {
 	return c.agentPID
 }
 
-// Address returns the host/address of the cluster.
+// Address returns the address of the cluster.
 func (c *Cluster) Address() string {
 	return c.agentPID.Address
 }
@@ -266,4 +266,8 @@ func (c *Cluster) Region() string {
 
 func getRandomListenAddr() string {
 	return fmt.Sprintf("127.0.0.1:%d", rand.Intn(50000)+10000)
+}
+
+func getRandomID() string {
+	return fmt.Sprintf("%d", rand.Intn(math.MaxInt))
 }

@@ -1,8 +1,6 @@
 package cluster
 
 import (
-	"fmt"
-	"math"
 	"math/rand"
 )
 
@@ -15,7 +13,7 @@ type ActivationConfig struct {
 // NewActivationConfig returns a new default config.
 func NewActivationConfig() ActivationConfig {
 	return ActivationConfig{
-		id:           fmt.Sprintf("%d", rand.Intn(math.MaxInt)),
+		id:           getRandomID(),
 		region:       "default",
 		selectMember: SelectRandomMember,
 	}
@@ -61,6 +59,6 @@ type ActivationDetails struct {
 }
 
 // SelectRandomMember selects a random member of the cluster.
-func SelectRandomMember(details ActivationDetails) *Member {
-	return details.Members[rand.Intn(len(details.Members))]
+func SelectRandomMember(ad ActivationDetails) *Member {
+	return ad.Members[rand.Intn(len(ad.Members))]
 }

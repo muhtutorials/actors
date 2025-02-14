@@ -100,8 +100,8 @@ func (e *Engine) Address() string {
 	return e.address
 }
 
-// Request sends the given message to the given PID as a "Request", returning
-// a response that will resolve in the future. Calling Response.Result() will
+// Request sends the message to the given PID as a "Request", returning
+// a response that will resolve in the future. Calling "Response.Result" will
 // block until the deadline is exceeded or the response is being resolved.
 func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
 	resp := NewResponse(e, timeout)

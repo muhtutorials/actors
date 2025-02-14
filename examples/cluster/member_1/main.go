@@ -18,19 +18,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	clus.RegisterKind(cluster.NewKindConfig(), "playerSession", shared.NewPlayer)
+	clus.RegisterKind(cluster.NewKindConfig(), "player", shared.NewPlayer)
 	eventPID := clus.Engine().SpawnFunc(func(ctx *actor.Context) {
 		switch msg := ctx.Message().(type) {
 		case cluster.ActivationEvent:
-			fmt.Println("got activation event")
+			fmt.Printf("Actor activated (PID=%s)\n", msg.PID)
 		case cluster.MemberJoinedEvent:
 			if msg.Member.ID == "B" {
 				conf := cluster.NewActivationConfig().
-					WithID("Borges").
+					WithID("C").
 					WithRegion("us-west")
-				playerPID := clus.Activate(conf, "playerSession")
-				m := &remote.TestMessage{Data: []byte("hello from member 1")}
-				ctx.Send(playerPID, m)
+				playerPID := clus.Activate(conf, "player")
+				message := &remote.TestMessage{Data: []byte("hello from member 1")}
+				ctx.Send(playerPID, message)
 			}
 		}
 	}, "event")

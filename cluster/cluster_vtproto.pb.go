@@ -52,8 +52,8 @@ func (m *Member) CloneVT() *Member {
 		return (*Member)(nil)
 	}
 	r := new(Member)
+	r.Address = m.Address
 	r.ID = m.ID
-	r.Host = m.Host
 	r.Region = m.Region
 	if rhs := m.Kinds; rhs != nil {
 		tmpContainer := make([]string, len(rhs))
@@ -94,11 +94,11 @@ func (m *Members) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
-func (m *MembersLeave) CloneVT() *MembersLeave {
+func (m *MembersLeft) CloneVT() *MembersLeft {
 	if m == nil {
-		return (*MembersLeave)(nil)
+		return (*MembersLeft)(nil)
 	}
-	r := new(MembersLeave)
+	r := new(MembersLeft)
 	if rhs := m.Members; rhs != nil {
 		tmpContainer := make([]*Member, len(rhs))
 		for k, v := range rhs {
@@ -113,7 +113,7 @@ func (m *MembersLeave) CloneVT() *MembersLeave {
 	return r
 }
 
-func (m *MembersLeave) CloneMessageVT() proto.Message {
+func (m *MembersLeft) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
@@ -147,19 +147,19 @@ func (m *Topology) CloneVT() *Topology {
 		}
 		r.Members = tmpContainer
 	}
-	if rhs := m.Left; rhs != nil {
-		tmpContainer := make([]*Member, len(rhs))
-		for k, v := range rhs {
-			tmpContainer[k] = v.CloneVT()
-		}
-		r.Left = tmpContainer
-	}
 	if rhs := m.Joined; rhs != nil {
 		tmpContainer := make([]*Member, len(rhs))
 		for k, v := range rhs {
 			tmpContainer[k] = v.CloneVT()
 		}
 		r.Joined = tmpContainer
+	}
+	if rhs := m.Left; rhs != nil {
+		tmpContainer := make([]*Member, len(rhs))
+		for k, v := range rhs {
+			tmpContainer[k] = v.CloneVT()
+		}
+		r.Left = tmpContainer
 	}
 	if rhs := m.Blocked; rhs != nil {
 		tmpContainer := make([]*Member, len(rhs))
@@ -354,10 +354,10 @@ func (this *Member) EqualVT(that *Member) bool {
 	} else if this == nil || that == nil {
 		return false
 	}
-	if this.ID != that.ID {
+	if this.Address != that.Address {
 		return false
 	}
-	if this.Host != that.Host {
+	if this.ID != that.ID {
 		return false
 	}
 	if this.Region != that.Region {
@@ -415,7 +415,7 @@ func (this *Members) EqualMessageVT(thatMsg proto.Message) bool {
 	}
 	return this.EqualVT(that)
 }
-func (this *MembersLeave) EqualVT(that *MembersLeave) bool {
+func (this *MembersLeft) EqualVT(that *MembersLeft) bool {
 	if this == that {
 		return true
 	} else if this == nil || that == nil {
@@ -441,8 +441,8 @@ func (this *MembersLeave) EqualVT(that *MembersLeave) bool {
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
-func (this *MembersLeave) EqualMessageVT(thatMsg proto.Message) bool {
-	that, ok := thatMsg.(*MembersLeave)
+func (this *MembersLeft) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*MembersLeft)
 	if !ok {
 		return false
 	}
@@ -473,31 +473,11 @@ func (this *Topology) EqualVT(that *Topology) bool {
 	} else if this == nil || that == nil {
 		return false
 	}
-	if this.Hash != that.Hash {
-		return false
-	}
 	if len(this.Members) != len(that.Members) {
 		return false
 	}
 	for i, vx := range this.Members {
 		vy := that.Members[i]
-		if p, q := vx, vy; p != q {
-			if p == nil {
-				p = &Member{}
-			}
-			if q == nil {
-				q = &Member{}
-			}
-			if !p.EqualVT(q) {
-				return false
-			}
-		}
-	}
-	if len(this.Left) != len(that.Left) {
-		return false
-	}
-	for i, vx := range this.Left {
-		vy := that.Left[i]
 		if p, q := vx, vy; p != q {
 			if p == nil {
 				p = &Member{}
@@ -527,6 +507,23 @@ func (this *Topology) EqualVT(that *Topology) bool {
 			}
 		}
 	}
+	if len(this.Left) != len(that.Left) {
+		return false
+	}
+	for i, vx := range this.Left {
+		vy := that.Left[i]
+		if p, q := vx, vy; p != q {
+			if p == nil {
+				p = &Member{}
+			}
+			if q == nil {
+				q = &Member{}
+			}
+			if !p.EqualVT(q) {
+				return false
+			}
+		}
+	}
 	if len(this.Blocked) != len(that.Blocked) {
 		return false
 	}
@@ -543,6 +540,9 @@ func (this *Topology) EqualVT(that *Topology) bool {
 				return false
 			}
 		}
+	}
+	if this.Hash != that.Hash {
+		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
@@ -835,17 +835,17 @@ func (m *Member) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.Host) > 0 {
-		i -= len(m.Host)
-		copy(dAtA[i:], m.Host)
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Host)))
-		i--
-		dAtA[i] = 0x12
-	}
 	if len(m.ID) > 0 {
 		i -= len(m.ID)
 		copy(dAtA[i:], m.ID)
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.ID)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Address) > 0 {
+		i -= len(m.Address)
+		copy(dAtA[i:], m.Address)
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Address)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -897,7 +897,7 @@ func (m *Members) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *MembersLeave) MarshalVT() (dAtA []byte, err error) {
+func (m *MembersLeft) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -910,12 +910,12 @@ func (m *MembersLeave) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *MembersLeave) MarshalToVT(dAtA []byte) (int, error) {
+func (m *MembersLeft) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *MembersLeave) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *MembersLeft) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -1015,21 +1015,14 @@ func (m *Topology) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.Hash != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.Hash))
+		i--
+		dAtA[i] = 0x28
+	}
 	if len(m.Blocked) > 0 {
 		for iNdEx := len(m.Blocked) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Blocked[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
-			i--
-			dAtA[i] = 0x2a
-		}
-	}
-	if len(m.Joined) > 0 {
-		for iNdEx := len(m.Joined) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.Joined[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -1051,9 +1044,9 @@ func (m *Topology) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 			dAtA[i] = 0x1a
 		}
 	}
-	if len(m.Members) > 0 {
-		for iNdEx := len(m.Members) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.Members[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+	if len(m.Joined) > 0 {
+		for iNdEx := len(m.Joined) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Joined[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -1063,10 +1056,17 @@ func (m *Topology) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 			dAtA[i] = 0x12
 		}
 	}
-	if m.Hash != 0 {
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.Hash))
-		i--
-		dAtA[i] = 0x8
+	if len(m.Members) > 0 {
+		for iNdEx := len(m.Members) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Members[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -1532,17 +1532,17 @@ func (m *Member) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.Host) > 0 {
-		i -= len(m.Host)
-		copy(dAtA[i:], m.Host)
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Host)))
-		i--
-		dAtA[i] = 0x12
-	}
 	if len(m.ID) > 0 {
 		i -= len(m.ID)
 		copy(dAtA[i:], m.ID)
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.ID)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Address) > 0 {
+		i -= len(m.Address)
+		copy(dAtA[i:], m.Address)
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(len(m.Address)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -1594,7 +1594,7 @@ func (m *Members) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *MembersLeave) MarshalVTStrict() (dAtA []byte, err error) {
+func (m *MembersLeft) MarshalVTStrict() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -1607,12 +1607,12 @@ func (m *MembersLeave) MarshalVTStrict() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *MembersLeave) MarshalToVTStrict(dAtA []byte) (int, error) {
+func (m *MembersLeft) MarshalToVTStrict(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVTStrict(dAtA[:size])
 }
 
-func (m *MembersLeave) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
+func (m *MembersLeft) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -1712,21 +1712,14 @@ func (m *Topology) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.Hash != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.Hash))
+		i--
+		dAtA[i] = 0x28
+	}
 	if len(m.Blocked) > 0 {
 		for iNdEx := len(m.Blocked) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Blocked[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
-			i--
-			dAtA[i] = 0x2a
-		}
-	}
-	if len(m.Joined) > 0 {
-		for iNdEx := len(m.Joined) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.Joined[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -1748,9 +1741,9 @@ func (m *Topology) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 			dAtA[i] = 0x1a
 		}
 	}
-	if len(m.Members) > 0 {
-		for iNdEx := len(m.Members) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.Members[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+	if len(m.Joined) > 0 {
+		for iNdEx := len(m.Joined) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Joined[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -1760,10 +1753,17 @@ func (m *Topology) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 			dAtA[i] = 0x12
 		}
 	}
-	if m.Hash != 0 {
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.Hash))
-		i--
-		dAtA[i] = 0x8
+	if len(m.Members) > 0 {
+		for iNdEx := len(m.Members) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Members[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -2145,11 +2145,11 @@ func (m *Member) SizeVT() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ID)
+	l = len(m.Address)
 	if l > 0 {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
-	l = len(m.Host)
+	l = len(m.ID)
 	if l > 0 {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
@@ -2183,7 +2183,7 @@ func (m *Members) SizeVT() (n int) {
 	return n
 }
 
-func (m *MembersLeave) SizeVT() (n int) {
+func (m *MembersLeft) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -2219,17 +2219,8 @@ func (m *Topology) SizeVT() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Hash != 0 {
-		n += 1 + protohelpers.SizeOfVarint(uint64(m.Hash))
-	}
 	if len(m.Members) > 0 {
 		for _, e := range m.Members {
-			l = e.SizeVT()
-			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
-		}
-	}
-	if len(m.Left) > 0 {
-		for _, e := range m.Left {
 			l = e.SizeVT()
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
@@ -2240,11 +2231,20 @@ func (m *Topology) SizeVT() (n int) {
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
 	}
+	if len(m.Left) > 0 {
+		for _, e := range m.Left {
+			l = e.SizeVT()
+			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
+		}
+	}
 	if len(m.Blocked) > 0 {
 		for _, e := range m.Blocked {
 			l = e.SizeVT()
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
+	}
+	if m.Hash != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.Hash))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -2599,6 +2599,38 @@ func (m *Member) UnmarshalVT(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Address", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Address = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
 			var stringLen uint64
@@ -2628,38 +2660,6 @@ func (m *Member) UnmarshalVT(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Host", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Host = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -2832,7 +2832,7 @@ func (m *Members) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *MembersLeave) UnmarshalVT(dAtA []byte) error {
+func (m *MembersLeft) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2855,10 +2855,10 @@ func (m *MembersLeave) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: MembersLeave: wiretype end group for non-group")
+			return fmt.Errorf("proto: MembersLeft: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: MembersLeave: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: MembersLeft: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -3034,25 +3034,6 @@ func (m *Topology) UnmarshalVT(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Hash", wireType)
-			}
-			m.Hash = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Hash |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Members", wireType)
 			}
@@ -3083,6 +3064,40 @@ func (m *Topology) UnmarshalVT(dAtA []byte) error {
 			}
 			m.Members = append(m.Members, &Member{})
 			if err := m.Members[len(m.Members)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Joined", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Joined = append(m.Joined, &Member{})
+			if err := m.Joined[len(m.Joined)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -3122,40 +3137,6 @@ func (m *Topology) UnmarshalVT(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Joined", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Joined = append(m.Joined, &Member{})
-			if err := m.Joined[len(m.Joined)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Blocked", wireType)
 			}
 			var msglen int
@@ -3188,6 +3169,25 @@ func (m *Topology) UnmarshalVT(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hash", wireType)
+			}
+			m.Hash = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Hash |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -4114,6 +4114,42 @@ func (m *Member) UnmarshalVTUnsafe(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Address", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			var stringValue string
+			if intStringLen > 0 {
+				stringValue = unsafe.String(&dAtA[iNdEx], intStringLen)
+			}
+			m.Address = stringValue
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
 			}
 			var stringLen uint64
@@ -4147,42 +4183,6 @@ func (m *Member) UnmarshalVTUnsafe(dAtA []byte) error {
 				stringValue = unsafe.String(&dAtA[iNdEx], intStringLen)
 			}
 			m.ID = stringValue
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Host", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			var stringValue string
-			if intStringLen > 0 {
-				stringValue = unsafe.String(&dAtA[iNdEx], intStringLen)
-			}
-			m.Host = stringValue
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -4363,7 +4363,7 @@ func (m *Members) UnmarshalVTUnsafe(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *MembersLeave) UnmarshalVTUnsafe(dAtA []byte) error {
+func (m *MembersLeft) UnmarshalVTUnsafe(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4386,10 +4386,10 @@ func (m *MembersLeave) UnmarshalVTUnsafe(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: MembersLeave: wiretype end group for non-group")
+			return fmt.Errorf("proto: MembersLeft: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: MembersLeave: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: MembersLeft: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -4565,25 +4565,6 @@ func (m *Topology) UnmarshalVTUnsafe(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Hash", wireType)
-			}
-			m.Hash = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Hash |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Members", wireType)
 			}
@@ -4614,6 +4595,40 @@ func (m *Topology) UnmarshalVTUnsafe(dAtA []byte) error {
 			}
 			m.Members = append(m.Members, &Member{})
 			if err := m.Members[len(m.Members)-1].UnmarshalVTUnsafe(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Joined", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Joined = append(m.Joined, &Member{})
+			if err := m.Joined[len(m.Joined)-1].UnmarshalVTUnsafe(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -4653,40 +4668,6 @@ func (m *Topology) UnmarshalVTUnsafe(dAtA []byte) error {
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Joined", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protohelpers.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return protohelpers.ErrInvalidLength
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Joined = append(m.Joined, &Member{})
-			if err := m.Joined[len(m.Joined)-1].UnmarshalVTUnsafe(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Blocked", wireType)
 			}
 			var msglen int
@@ -4719,6 +4700,25 @@ func (m *Topology) UnmarshalVTUnsafe(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Hash", wireType)
+			}
+			m.Hash = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Hash |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])

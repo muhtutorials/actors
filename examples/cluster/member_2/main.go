@@ -18,11 +18,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	clus.RegisterKind(cluster.NewKindConfig(), "playerSession", shared.NewPlayer)
+	clus.RegisterKind(cluster.NewKindConfig(), "player", shared.NewPlayer)
 	eventPID := clus.Engine().SpawnFunc(func(ctx *actor.Context) {
 		switch msg := ctx.Message().(type) {
 		case cluster.ActivationEvent:
-			fmt.Println("got activation event:", msg)
+			fmt.Printf("Actor activated (PID=%s)\n", msg.PID)
 		default:
 			fmt.Println("got:", reflect.TypeOf(msg))
 		}

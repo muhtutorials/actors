@@ -18,10 +18,10 @@ func (s *MemberSet) Len() int {
 	return len(s.members)
 }
 
-func (s *MemberSet) GetByHost(host string) *Member {
+func (s *MemberSet) GetByAddress(addr string) *Member {
 	var member *Member
 	for _, m := range s.members {
-		if m.Host == host {
+		if m.Address == addr {
 			member = m
 		}
 	}
@@ -41,8 +41,8 @@ func (s *MemberSet) Remove(m *Member) {
 	delete(s.members, m.ID)
 }
 
-func (s *MemberSet) RemoveByHost(host string) {
-	member := s.GetByHost(host)
+func (s *MemberSet) RemoveByAddress(addr string) {
+	member := s.GetByAddress(addr)
 	if member != nil {
 		s.Remove(member)
 	}
@@ -79,8 +79,8 @@ func (s *MemberSet) FilterByKind(kind string) []*Member {
 // Difference calculates the difference of sets "s.members" and "members".
 func (s *MemberSet) Difference(members []*Member) []*Member {
 	var (
-		diff []*Member
 		m    = make(map[string]*Member)
+		diff []*Member
 	)
 	for _, member := range members {
 		m[member.ID] = member

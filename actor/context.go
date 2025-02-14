@@ -33,16 +33,6 @@ func NewContext(pid *PID, e *Engine, ctx context.Context) *Context {
 	}
 }
 
-// Context returns a context.Context, user defined on spawn or
-// a context.Background as default.
-func (c *Context) Context() context.Context {
-	return c.context
-}
-
-func (c *Context) Receiver() Receiver {
-	return c.receiver
-}
-
 func (c *Context) Request(pid *PID, msg any, timeout time.Duration) *Response {
 	return c.engine.Request(pid, msg, timeout)
 }
@@ -110,9 +100,9 @@ func (c *Context) Forward(pid *PID) {
 	c.engine.SendWithSender(pid, c.message, c.pid)
 }
 
-// GetProcPID returns the PID of the process found by the id.
+// GetProcessPID returns the PID of the process found by the id.
 // Returns nil when it could not find any process.
-func (c *Context) GetProcPID(id string) *PID {
+func (c *Context) GetProcessPID(id string) *PID {
 	proc := c.engine.Registry.GetByID(id)
 	if proc != nil {
 		return proc.PID()
@@ -136,9 +126,19 @@ func (c *Context) Engine() *Engine {
 	return c.engine
 }
 
+func (c *Context) Receiver() Receiver {
+	return c.receiver
+}
+
 // Message returns the message that is currently being received.
 func (c *Context) Message() any {
 	return c.message
+}
+
+// Context returns a "context.Context", user defined on spawn or
+// a "context.Background" as default.
+func (c *Context) Context() context.Context {
+	return c.context
 }
 
 // Parent returns the PID of the process that spawned the current process.
