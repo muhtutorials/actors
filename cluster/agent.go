@@ -86,7 +86,7 @@ func (a *Agent) handleActivation(msg *Activation) {
 
 func (a *Agent) handleDeactivation(msg *Deactivation) {
 	a.removeActivated(msg.PID)
-	a.cluster.engine.Poison(msg.PID)
+	a.cluster.engine.Kill(msg.PID)
 	a.cluster.engine.BroadcastEvent(DeactivationEvent{PID: msg.PID})
 }
 

@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func (r *Response) Result() (any, error) {
 
 func (r *Response) Start() {}
 
-func (r *Response) ShutDown(_ *sync.WaitGroup) {}
+func (r *Response) ShutDown() {}
 
 func (r *Response) Send(_ *PID, msg any, _ *PID) {
 	r.result <- msg

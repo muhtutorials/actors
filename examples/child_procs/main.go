@@ -68,6 +68,6 @@ func main() {
 	pid := engine.Spawn(newFooReceiver, "foo")
 	engine.Send(pid, message{data: ":-)"})
 	time.Sleep(time.Second * 8)
-	engine.Poison(pid)
+	<-engine.Kill(pid).Done()
 	time.Sleep(time.Second)
 }

@@ -43,5 +43,5 @@ func main() {
 		}
 	}, "foo")
 	engine.Send(pid, message{data: "I'll be back!"})
-	engine.Poison(pid).Wait()
+	<-engine.Kill(pid).Done()
 }

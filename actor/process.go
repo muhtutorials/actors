@@ -2,11 +2,11 @@ package actor
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/DataDog/gostackparse"
 	"log/slog"
 	"runtime/debug"
-	"sync"
 	"time"
 )
 
@@ -18,7 +18,7 @@ type Envelope struct {
 // Processor is an interface that abstracts the way a process behaves.
 type Processor interface {
 	Start()
-	ShutDown(*sync.WaitGroup)
+	ShutDown()
 	Send(*PID, any, *PID)
 	Invoke([]Envelope)
 	PID() *PID
@@ -45,8 +45,7 @@ func newProcess(e *Engine, opts Opts) *process {
 }
 
 func (p *process) Start() {
-	receiver := p.Producer()
-	p.context.receiver = receiver
+	p.context.receiver = p.Producer()
 	defer func() {
 		if v := recover(); v != nil {
 			p.context.message = Stopped{}
@@ -74,8 +73,8 @@ func (p *process) Start() {
 	p.inbox.Start(p)
 }
 
-func (p *process) ShutDown(wg *sync.WaitGroup) {
-	p.cleanUp(wg)
+func (p *process) ShutDown() {
+	p.cleanUp(nil)
 }
 
 func (p *process) Send(_ *PID, msg any, sender *PID) {
@@ -107,16 +106,16 @@ func (p *process) Invoke(msgs []Envelope) {
 	for i := 0; i < nMessages; i++ {
 		nProcessed++
 		msg := msgs[i]
-		if pill, ok := msg.Message.(poisonPill); ok {
+		if kill, ok := msg.Message.(killProcess); ok {
 			// If we need to stop gracefully, we process all the messages
 			// from the inbox, otherwise we ignore and clean up.
-			if pill.graceful {
+			if kill.graceful {
 				unprocessed := msgs[processed:]
 				for _, m := range unprocessed {
 					p.invokeMessage(m)
 				}
 			}
-			p.cleanUp(pill.wg)
+			p.cleanUp(kill.cancel)
 			return
 		}
 		p.invokeMessage(msg)
@@ -174,14 +173,15 @@ func (p *process) tryRestart(v any) {
 	p.Start()
 }
 
-func (p *process) cleanUp(wg *sync.WaitGroup) {
+func (p *process) cleanUp(cancel context.CancelFunc) {
+	defer cancel()
 	if p.context.parentCtx != nil {
 		_ = p.context.parentCtx.children.Delete(p.pid.ID)
 	}
 	if p.context.children.Len() > 0 {
 		children := p.context.Children()
 		for _, pid := range children {
-			p.context.engine.Poison(pid).Wait()
+			<-p.context.engine.Kill(pid).Done()
 		}
 	}
 	_ = p.inbox.Stop()
@@ -192,14 +192,11 @@ func (p *process) cleanUp(wg *sync.WaitGroup) {
 		PID:       p.pid,
 		Timestamp: time.Now(),
 	})
-	if wg != nil {
-		wg.Done()
-	}
 }
 
 func (p *process) invokeMessage(msg Envelope) {
-	// Suppress poison pill messages here. They're private to the actor engine.
-	if _, ok := msg.Message.(poisonPill); ok {
+	// Suppress "killProcess" messages here. They're private to the actor engine.
+	if _, ok := msg.Message.(killProcess); ok {
 		return
 	}
 	p.context.sender = msg.Sender

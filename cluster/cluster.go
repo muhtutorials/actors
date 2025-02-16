@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
-	"sync"
 	"time"
 )
 
@@ -120,12 +119,10 @@ func (c *Cluster) Start() {
 	c.isStarted = true
 }
 
-// Stop will shut down the cluster poisoning all its actors.
-func (c *Cluster) Stop() *sync.WaitGroup {
-	wg := new(sync.WaitGroup)
-	c.engine.Poison(c.agentPID, wg)
-	c.engine.Poison(c.providerPID, wg)
-	return wg
+// Stop will shut down the cluster killing all its actors.
+func (c *Cluster) Stop() {
+	<-c.engine.Kill(c.agentPID).Done()
+	<-c.engine.Kill(c.providerPID).Done()
 }
 
 // Spawn spawns an actor locally with cluster awareness.

@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -192,40 +193,44 @@ func (e *Engine) SendAtInterval(pid *PID, msg any, interval time.Duration) Sende
 	return r
 }
 
-// Stop will send a non-graceful poisonPill message to the process that is associated with the given PID.
-// The process will shut down immediately, once it has processed the poisonPill message.
-func (e *Engine) Stop(pid *PID, wgs ...*sync.WaitGroup) *sync.WaitGroup {
-	return e.sendPoisonPill(pid, false, wgs...)
+// Stop will send a non-graceful "killProcess" message to the process that is associated with the given PID.
+// The process will shut down immediately, once it has processed the "killProcess" message.
+func (e *Engine) Stop(pid *PID) context.Context {
+	return e.sendKillProcess(context.Background(), pid, false)
 }
 
-// Poison will send a graceful "poisonPill" message to the process that is associated with the given PID.
+// Kill will send a graceful "killProcess" message to the process that is associated with the given PID.
 // The process will shut down gracefully once it has processed all the messages in the inbox.
-// If given a "WaitGroup", it blocks till the process is completely shut down.
-func (e *Engine) Poison(pid *PID, wg ...*sync.WaitGroup) *sync.WaitGroup {
-	return e.sendPoisonPill(pid, true, wg...)
+// A context is returned that can be used to block or wait until the process is stopped.
+func (e *Engine) Kill(pid *PID) context.Context {
+	return e.sendKillProcess(context.Background(), pid, true)
 }
 
-func (e *Engine) sendPoisonPill(pid *PID, graceful bool, wg ...*sync.WaitGroup) *sync.WaitGroup {
-	waitGroup := new(sync.WaitGroup)
-	if len(wg) > 0 {
-		waitGroup = wg[0]
-	}
-	pill := poisonPill{
-		wg:       waitGroup,
+// KillWithCtx behaves the exact same way as "Kill", the only difference is that it accepts
+// a context as the first argument. The context can be used for custom timeouts and manual
+// cancellation.
+func (e *Engine) KillWithCtx(ctx context.Context, pid *PID) context.Context {
+	return e.sendKillProcess(ctx, pid, true)
+}
+
+func (e *Engine) sendKillProcess(ctx context.Context, pid *PID, graceful bool) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	kill := killProcess{
+		cancel:   cancel,
 		graceful: graceful,
 	}
-	// if we didn't find the process, we will broadcast an "DeadLetterEvent".
+	// if the process isn't found a "DeadLetterEvent" is broadcast.
 	if e.Registry.Get(pid) == nil {
 		e.BroadcastEvent(DeadLetterEvent{
 			Target:  pid,
-			Message: pill,
+			Message: kill,
 			Sender:  nil,
 		})
-		return waitGroup
+		cancel()
+		return ctx
 	}
-	waitGroup.Add(1)
-	e.SendLocal(pid, pill, nil)
-	return waitGroup
+	e.SendLocal(pid, kill, nil)
+	return ctx
 }
 
 // SendLocal will send the given message to the given PID. If the recipient is not in the

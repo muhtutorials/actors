@@ -41,7 +41,7 @@ func NewInbox(size int) *Inbox {
 }
 
 func (in *Inbox) Start(proc Processor) {
-	// Transition to "starting" and then "idle" to ensure no race condition on in.proc.
+	// Transition to "starting" and then "idle" to ensure no race condition on "in.proc".
 	if in.procStatus.CompareAndSwap(stopped, starting) {
 		in.proc = proc
 		in.procStatus.Swap(idle)
@@ -67,7 +67,12 @@ func (in *Inbox) schedule() {
 
 func (in *Inbox) process() {
 	in.run()
-	in.procStatus.CompareAndSwap(running, idle)
+	if in.procStatus.CompareAndSwap(running, idle) && in.buf.Len() > 0 {
+		// Messages might have been added to the ring buffer
+		// between the last pop and the transition to "idle".
+		// if this is the case, then we should schedule again.
+		in.schedule()
+	}
 }
 
 func (in *Inbox) run() {

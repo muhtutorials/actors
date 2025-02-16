@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"storj.io/drpc/drpcconn"
-	"sync"
 	"time"
 )
 
@@ -48,7 +47,7 @@ func (s *streamWriter) Start() {
 	s.init()
 }
 
-func (s *streamWriter) ShutDown(wg *sync.WaitGroup) {
+func (s *streamWriter) ShutDown() {
 	event := actor.RemoteUnreachableEvent{ListenAddr: s.writeToAddr}
 	s.engine.Send(s.routerPID, event)
 	s.engine.BroadcastEvent(event)
@@ -57,9 +56,6 @@ func (s *streamWriter) ShutDown(wg *sync.WaitGroup) {
 	}
 	_ = s.inbox.Stop()
 	s.engine.Registry.Remove(s.PID())
-	if wg != nil {
-		wg.Done()
-	}
 }
 
 func (s *streamWriter) Send(_ *actor.PID, msg any, sender *actor.PID) {
@@ -156,7 +152,7 @@ func (s *streamWriter) init() {
 	// We could not reach the remote after retrying "n" times. Hence, shut down the stream writer
 	// and broadcast "EventRemoteUnreachable".
 	if rawConn == nil {
-		s.ShutDown(nil)
+		s.ShutDown()
 		return
 	}
 	s.rawConn = rawConn
@@ -169,7 +165,7 @@ func (s *streamWriter) init() {
 	stream, err := client.Receive(context.Background())
 	if err != nil {
 		slog.Error("receive", "err", err, "remote", s.writeToAddr)
-		s.ShutDown(nil)
+		s.ShutDown()
 		return
 	}
 	s.stream = stream
@@ -178,7 +174,7 @@ func (s *streamWriter) init() {
 	go func() {
 		<-s.conn.Closed()
 		slog.Debug("lost connection", "remote", s.writeToAddr)
-		s.ShutDown(nil)
+		s.ShutDown()
 	}()
 }
 

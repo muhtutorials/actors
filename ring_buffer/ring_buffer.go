@@ -6,7 +6,7 @@ import (
 )
 
 type buffer[T any] struct {
-	items            []T
+	items []T
 	// head is the type's zero value. items start at the next index.
 	// tail is the last inserted value.
 	head, tail, size int64
@@ -58,12 +58,12 @@ func (rb *RingBuffer[T]) Push(item T) {
 }
 
 func (rb *RingBuffer[T]) Pop() (T, bool) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
 	var t T
 	if rb.Len() == 0 {
 		return t, false
 	}
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
 	//  head[1]  tail[4]
 	//     v        v
 	// [0, 0, 6, 2, 5]
@@ -76,11 +76,11 @@ func (rb *RingBuffer[T]) Pop() (T, bool) {
 }
 
 func (rb *RingBuffer[T]) PopN(n int64) ([]T, bool) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
 	if rb.Len() == 0 {
 		return nil, false
 	}
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
 	if n > rb.Len() {
 		n = rb.Len()
 	}
