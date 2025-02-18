@@ -14,9 +14,9 @@ type opts struct {
 	port int
 }
 
-type optFunc func(opts *opts)
+type OptFunc func(*opts)
 
-func applyOpts(optFns ...optFunc) *opts {
+func applyOpts(optFns ...OptFunc) *opts {
 	options := &opts{
 		id: fmt.Sprintf("engine_%d", time.Now().UnixNano()),
 	}
@@ -26,8 +26,8 @@ func applyOpts(optFns ...optFunc) *opts {
 	return options
 }
 
-// withAnnounceAddr specifies engine's ip and port information to announce
-func withAnnounceAddr(ip string, p int) optFunc {
+// WithAnnounceAddr specifies engine's ip and port information to announce
+func WithAnnounceAddr(ip string, p int) OptFunc {
 	return func(opts *opts) {
 		opts.ip = append(opts.ip, ip)
 		opts.port = p

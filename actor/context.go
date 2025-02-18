@@ -78,11 +78,11 @@ func (c *Context) Send(pid *PID, msg any) {
 	c.engine.SendWithSender(pid, msg, c.pid)
 }
 
-// SendAtInterval will send a message to a PID at a provided interval.
-// It will return a "SenderAtInterval" struct that can stop the repeated
-// sending of a message by calling "Stop".
-func (c *Context) SendAtInterval(pid *PID, msg any, interval time.Duration) SenderAtInterval {
-	r := SenderAtInterval{
+// Repeat will send a message to a PID at a provided interval.
+// It will return a "Repeater" that can be used to stop
+// the repeated sending of the message by calling "Stop".
+func (c *Context) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
+	r := Repeater{
 		self:     c.pid,
 		target:   pid.CloneVT(),
 		engine:   c.engine,
@@ -103,11 +103,11 @@ func (c *Context) Forward(pid *PID) {
 // GetProcessPID returns the PID of the process found by the id.
 // Returns nil when it could not find any process.
 func (c *Context) GetProcessPID(id string) *PID {
-	proc := c.engine.Registry.GetByID(id)
-	if proc != nil {
-		return proc.PID()
+	proc, err := c.engine.Processes.Get(id)
+	if err != nil {
+		return nil
 	}
-	return nil
+	return proc.PID()
 }
 
 // PID returns the PID of the process that belongs to the context.

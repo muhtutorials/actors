@@ -185,7 +185,7 @@ func (p *process) cleanUp(cancel context.CancelFunc) {
 		}
 	}
 	_ = p.inbox.Stop()
-	p.context.engine.Registry.Remove(p.pid)
+	_ = p.context.engine.Processes.Delete(p.pid.ID)
 	p.context.message = Stopped{}
 	p.receive()
 	p.context.engine.BroadcastEvent(ActorStoppedEvent{

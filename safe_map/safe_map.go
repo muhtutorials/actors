@@ -10,9 +10,16 @@ type SafeMap[K comparable, V any] struct {
 	mu   sync.RWMutex
 }
 
-func New[K comparable, V any]() *SafeMap[K, V] {
+// New creates a new thread safe map with optional size parameter.
+func New[K comparable, V any](size ...int) *SafeMap[K, V] {
+	var data map[K]V
+	if len(size) > 0 {
+		data = make(map[K]V, size[0])
+	} else {
+		data = make(map[K]V)
+	}
 	return &SafeMap[K, V]{
-		data: make(map[K]V),
+		data: data,
 	}
 }
 

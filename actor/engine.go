@@ -3,36 +3,14 @@ package actor
 import (
 	"context"
 	"fmt"
+	"github.com/muhtutorials/actors/safe_map"
 	"math"
 	"math/rand"
 	"strconv"
-	"sync"
 	"time"
 )
 
-// Remoter abstracts a remote that's tied to an engine.
-type Remoter interface {
-	Start(*Engine) error
-	Stop() *sync.WaitGroup
-	Send(*PID, any, *PID)
-	Address() string
-}
-
-// Producer is a function that can return a Receiver.
-type Producer func() Receiver
-
-// Receiver (actor) receives and processes messages.
-type Receiver interface {
-	Receive(*Context)
-}
-
-// Engine represents the actor engine.
-type Engine struct {
-	Registry    *Registry
-	address     string
-	remote      Remoter
-	eventStream *PID
-}
+const LocalLookupAddr = "local"
 
 // EngineConfig holds the configuration of the engine.
 type EngineConfig struct {
@@ -51,10 +29,18 @@ func (cfg EngineConfig) WithRemote(r Remoter) EngineConfig {
 	return cfg
 }
 
+// Engine represents the actor engine.
+type Engine struct {
+	Processes   *safe_map.SafeMap[string, Processor]
+	address     string
+	remote      Remoter
+	eventStream *PID
+}
+
 // NewEngine returns a new actor Engine given an EngineConfig.
 func NewEngine(cfg EngineConfig) (*Engine, error) {
 	e := new(Engine)
-	e.Registry = NewRegistry(e) // need to init the registry in case we want a custom dead letter
+	e.Processes = safe_map.New[string, Processor](1024)
 	e.address = LocalLookupAddr
 	if cfg.remote != nil {
 		e.remote = cfg.remote
@@ -78,8 +64,7 @@ func (e *Engine) Spawn(p Producer, kind string, optFns ...OptFunc) *PID {
 	if opts.ID == "" {
 		opts.ID = strconv.Itoa(rand.Intn(math.MaxInt))
 	}
-	proc := newProcess(e, opts)
-	return e.SpawnProcess(proc)
+	return e.SpawnProcess(newProcess(e, opts))
 }
 
 // SpawnFunc spawns the given function as a stateless receiver/actor.
@@ -89,26 +74,16 @@ func (e *Engine) SpawnFunc(fn func(*Context), kind string, optFns ...OptFunc) *P
 
 // SpawnProcess spawns the given Processor. This function is useful when working
 // with custom created processes. Take a look at the streamWriter as an example.
-func (e *Engine) SpawnProcess(p Processor) *PID {
-	e.Registry.Add(p)
-	return p.PID()
-}
-
-// Address returns the address of the actor engine. When there is
-// no remote configured, the "local" address will be used, otherwise
-// the listen address of the remote.
-func (e *Engine) Address() string {
-	return e.address
-}
-
-// Request sends the message to the given PID as a "Request", returning
-// a response that will resolve in the future. Calling "Response.Result" will
-// block until the deadline is exceeded or the response is being resolved.
-func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
-	resp := NewResponse(e, timeout)
-	e.Registry.Add(resp)
-	e.SendWithSender(pid, msg, resp.PID())
-	return resp
+func (e *Engine) SpawnProcess(proc Processor) *PID {
+	pid := proc.PID()
+	id := pid.ID
+	if _, err := e.Processes.Get(id); err == nil {
+		e.BroadcastEvent(ActorDuplicateIDEvent{PID: pid})
+		return pid
+	}
+	e.Processes.Insert(id, proc)
+	proc.Start()
+	return pid
 }
 
 // SendWithSender will send the given message to the given PID with the
@@ -124,19 +99,12 @@ func (e *Engine) Send(pid *PID, msg any) {
 	e.send(pid, msg, nil)
 }
 
-// BroadcastEvent will broadcast the given message over the event stream, notifying all
-// actors that are subscribed.
-func (e *Engine) BroadcastEvent(msg any) {
-	if e.eventStream != nil {
-		e.send(e.eventStream, msg, nil)
-	}
-}
-
 func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	if pid == nil {
 		return
 	}
-	if e.isLocalMessage(pid) {
+	// check if it's a local message
+	if e.address == pid.Address {
 		e.SendLocal(pid, msg, sender)
 		return
 	}
@@ -147,10 +115,67 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	e.remote.Send(pid, msg, sender)
 }
 
-// SenderAtInterval is a struct that can be used to send a message at an interval to a given PID.
-// If you need to have an actor wake up periodically, you can use a SenderAtInterval.
-// It is started by the "SendAtInterval" method and stopped by "Stop" method.
-type SenderAtInterval struct {
+// SendLocal will send the given message to the given PID. If the recipient is not in the
+// "Processes", the message will broadcast as a "DeadLetterEvent".
+func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
+	proc, err := e.Processes.Get(pid.ID)
+	if err != nil {
+		e.BroadcastEvent(DeadLetterEvent{
+			Target:  pid,
+			Message: msg,
+			Sender:  nil,
+		})
+		return
+	}
+	proc.Send(pid, msg, sender)
+}
+
+// BroadcastEvent will broadcast the given message over the event stream, notifying all
+// actors that are subscribed.
+func (e *Engine) BroadcastEvent(msg any) {
+	if e.eventStream != nil {
+		e.send(e.eventStream, msg, nil)
+	}
+}
+
+// Subscribe will subscribe the given PID to the event stream.
+func (e *Engine) Subscribe(pid *PID) {
+	e.Send(e.eventStream, subscribeEvent{pid: pid})
+}
+
+// Unsubscribe will unsubscribe the given PID from the event stream.
+func (e *Engine) Unsubscribe(pid *PID) {
+	e.Send(e.eventStream, unsubscribeEvent{pid: pid})
+}
+
+// Request sends the message to the given PID as a "Request", returning
+// a response that will resolve in the future. Calling "Response.Result" will
+// block until the deadline is exceeded or the response is being resolved.
+func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
+	resp := NewResponse(e, timeout)
+	e.Processes.Insert(resp.PID().ID, resp)
+	e.SendWithSender(pid, msg, resp.PID())
+	return resp
+}
+
+// Repeat will send a message to a PID at a provided interval.
+// It will return a "Repeater" that can be used to stop
+// the repeated sending of the message by calling "Stop".
+func (e *Engine) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
+	r := Repeater{
+		self:     nil,
+		target:   pid.CloneVT(),
+		engine:   e,
+		message:  msg,
+		interval: interval,
+		cancelCh: make(chan struct{}, 1),
+	}
+	r.Start()
+	return r
+}
+
+// Repeater is used to send a message at an interval to a given PID.
+type Repeater struct {
 	self     *PID
 	target   *PID
 	engine   *Engine
@@ -159,7 +184,7 @@ type SenderAtInterval struct {
 	cancelCh chan struct{}
 }
 
-func (r SenderAtInterval) Start() {
+func (r Repeater) Start() {
 	ticker := time.NewTicker(r.interval)
 	go func() {
 		for {
@@ -174,23 +199,8 @@ func (r SenderAtInterval) Start() {
 	}()
 }
 
-func (r SenderAtInterval) Stop() {
+func (r Repeater) Stop() {
 	close(r.cancelCh)
-}
-
-// SendAtInterval will send a message to a PID at a provided interval.
-// It will return a "SenderAtInterval" struct that can stop the repeated sending of a message by calling "Stop".
-func (e *Engine) SendAtInterval(pid *PID, msg any, interval time.Duration) SenderAtInterval {
-	r := SenderAtInterval{
-		self:     nil,
-		target:   pid.CloneVT(),
-		engine:   e,
-		message:  msg,
-		interval: interval,
-		cancelCh: make(chan struct{}, 1),
-	}
-	r.Start()
-	return r
 }
 
 // Stop will send a non-graceful "killProcess" message to the process that is associated with the given PID.
@@ -219,8 +229,8 @@ func (e *Engine) sendKillProcess(ctx context.Context, pid *PID, graceful bool) c
 		cancel:   cancel,
 		graceful: graceful,
 	}
-	// if the process isn't found a "DeadLetterEvent" is broadcast.
-	if e.Registry.Get(pid) == nil {
+	// if the process isn't found, a "DeadLetterEvent" is broadcast
+	if _, err := e.Processes.Get(pid.ID); err != nil {
 		e.BroadcastEvent(DeadLetterEvent{
 			Target:  pid,
 			Message: kill,
@@ -233,54 +243,9 @@ func (e *Engine) sendKillProcess(ctx context.Context, pid *PID, graceful bool) c
 	return ctx
 }
 
-// SendLocal will send the given message to the given PID. If the recipient is not in the
-// registry, the message will be sent to the DeadLetter process instead. If there is no DeadLetter
-// process registered, the function will panic.
-func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
-	proc := e.Registry.Get(pid)
-	if proc == nil {
-		e.BroadcastEvent(DeadLetterEvent{
-			Target:  pid,
-			Message: msg,
-			Sender:  nil,
-		})
-		return
-	}
-	proc.Send(pid, msg, sender)
-}
-
-// Subscribe will subscribe the given PID to the event stream.
-func (e *Engine) Subscribe(pid *PID) {
-	e.Send(e.eventStream, subscribeEvent{pid: pid})
-}
-
-// Unsubscribe will unsubscribe the given PID from the event stream.
-func (e *Engine) Unsubscribe(pid *PID) {
-	e.Send(e.eventStream, unsubscribeEvent{pid: pid})
-}
-
-func (e *Engine) isLocalMessage(pid *PID) bool {
-	if pid == nil {
-		return false
-	}
-	return e.address == pid.Address
-}
-
-// funcReceiver is used to turn a stateless actor into a producer.
-// "func(*Context)" becomes "Producer".
-// Its usage can be seen inside "Engine.SpawnFunc" method.
-type funcReceiver struct {
-	fn func(*Context)
-}
-
-func newFuncReceiver(fn func(ctx *Context)) Producer {
-	return func() Receiver {
-		return &funcReceiver{
-			fn: fn,
-		}
-	}
-}
-
-func (r *funcReceiver) Receive(ctx *Context) {
-	r.fn(ctx)
+// Address returns the address of the actor engine. When there is
+// no remote configured, the "local" address will be used, otherwise
+// the listen address of the remote.
+func (e *Engine) Address() string {
+	return e.address
 }

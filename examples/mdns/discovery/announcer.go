@@ -23,7 +23,7 @@ func newAnnouncer(opts *opts) *announcer {
 	}
 }
 
-func (a *announcer) Start() {
+func (a *announcer) start() {
 	server, err := zeroconf.RegisterProxy(
 		a.id,
 		serviceName,
@@ -40,6 +40,6 @@ func (a *announcer) Start() {
 	a.server = server
 }
 
-func (a *announcer) Shutdown() {
+func (a *announcer) shutdown() {
 	a.server.Shutdown()
 }

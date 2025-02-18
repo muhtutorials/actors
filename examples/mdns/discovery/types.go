@@ -1,6 +1,6 @@
 package discovery
 
-type discoveryEvent struct {
-	id        string
-	addresses []string
+type DiscoveryEvent struct {
+	ID    string
+	Addrs []string
 }

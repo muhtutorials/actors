@@ -55,7 +55,7 @@ func (s *streamWriter) ShutDown() {
 		_ = s.stream.Close()
 	}
 	_ = s.inbox.Stop()
-	s.engine.Registry.Remove(s.PID())
+	_ = s.engine.Processes.Delete(s.PID().ID)
 }
 
 func (s *streamWriter) Send(_ *actor.PID, msg any, sender *actor.PID) {

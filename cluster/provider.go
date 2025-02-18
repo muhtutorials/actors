@@ -44,7 +44,7 @@ type Provider struct {
 	pid          *actor.PID
 	members      *MemberSet
 	membersAlive *MemberSet
-	memberPinger actor.SenderAtInterval
+	memberPinger actor.Repeater
 	eventPID     *actor.PID
 	resolver     *zeroconf.Resolver
 	announcer    *zeroconf.Server
@@ -89,7 +89,7 @@ func (p *Provider) Receive(ctx *actor.Context) {
 func (p *Provider) handleActorStarted(ctx *actor.Context) {
 	p.pid = ctx.PID()
 	p.members.Add(p.cluster.Member())
-	p.memberPinger = ctx.SendAtInterval(ctx.PID(), MemberPing{}, memberPingInterval)
+	p.memberPinger = ctx.Repeat(ctx.PID(), MemberPing{}, memberPingInterval)
 	p.context, p.cancel = context.WithCancel(context.Background())
 	p.sendMembersToAgent()
 	p.start(ctx)
