@@ -84,33 +84,29 @@ func (p *process) Send(_ *PID, msg any, sender *PID) {
 func (p *process) Invoke(msgs []Envelope) {
 	// Number of messages that need to be processed.
 	nMessages := len(msgs)
-	// Number of messages that are processed.
+	// Number of messages that have been processed.
 	nProcessed := 0
-	// FIXME: We could use nProcessed here, but for some reason placing nProcessed++ on the
-	// bottom of the function freezes some tests. Hence, I created a new counter
-	// for bookkeeping.
-	processed := 0
 	defer func() {
-		// If we recovered, we buffer up all the messages that we could not process
-		// so we can retry them on the next restart.
+		// if the process recovers, all the unprocessed messages are saved to the buffer
+		// so that they can be processed after the process restarts.
 		if v := recover(); v != nil {
 			p.context.message = Stopped{}
 			p.receive()
-			p.messageBuf = make([]Envelope, nMessages-nProcessed)
-			for i := 0; i < nMessages-nProcessed; i++ {
-				p.messageBuf[i] = msgs[i+nProcessed]
+			nUnprocessed := nMessages - nProcessed
+			p.messageBuf = make([]Envelope, nUnprocessed)
+			for i := 0; i < nUnprocessed; i++ {
+				p.messageBuf[i] = msgs[nProcessed+i]
 			}
 			p.tryRestart(v)
 		}
 	}()
 	for i := 0; i < nMessages; i++ {
-		nProcessed++
 		msg := msgs[i]
 		if kill, ok := msg.Message.(killProcess); ok {
 			// If we need to stop gracefully, we process all the messages
 			// from the inbox, otherwise we ignore and clean up.
 			if kill.graceful {
-				unprocessed := msgs[processed:]
+				unprocessed := msgs[nProcessed:]
 				for _, m := range unprocessed {
 					p.invokeMessage(m)
 				}
@@ -119,7 +115,7 @@ func (p *process) Invoke(msgs []Envelope) {
 			return
 		}
 		p.invokeMessage(msg)
-		processed++
+		nProcessed++
 	}
 }
 
@@ -144,7 +140,7 @@ func (p *process) tryRestart(v any) {
 	// back up. NOTE: not sure if that is the best option. What if that
 	// node never comes back up again?
 	if err, ok := v.(*InternalError); ok {
-		slog.Error(err.From, "err", err.Err)
+		slog.Error("internal error", "from", err.From, "err", err.Err)
 		time.Sleep(p.Opts.RestartDelay)
 		p.Start()
 		return
@@ -160,8 +156,8 @@ func (p *process) tryRestart(v any) {
 		return
 	}
 	stackTrace := cleanTrace(debug.Stack())
-	p.restarts++
 	// Restart the process after its "restartDelay".
+	p.restarts++
 	p.context.engine.BroadcastEvent(ActorRestartedEvent{
 		PID:        p.pid,
 		Timestamp:  time.Now(),
@@ -195,7 +191,6 @@ func (p *process) cleanUp(cancel context.CancelFunc) {
 }
 
 func (p *process) invokeMessage(msg Envelope) {
-	// Suppress "killProcess" messages here. They're private to the actor engine.
 	if _, ok := msg.Message.(killProcess); ok {
 		return
 	}

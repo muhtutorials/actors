@@ -21,8 +21,12 @@ func NewPromMetrics(prefix string) *PromMetrics {
 		Help: "actor message counter",
 	})
 	msgLatency := promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    fmt.Sprintf("%s_actor_msg_latency", prefix),
-		Help:    "actor message latency",
+		Name: fmt.Sprintf("%s_actor_msg_latency", prefix),
+		Help: "actor message latency",
+		// Buckets is a predefined range of values used to categorize and count
+		// observations in histogram metrics. Each bucket represents a cumulative
+		// count of all observations less than or equal to its upper bound.
+		// "0.1, 0.5, 1" are buckets into which latency of 0.1s, 0.5s and 1s will go.
 		Buckets: []float64{0.1, 0.5, 1},
 	})
 	return &PromMetrics{
@@ -98,4 +102,5 @@ func main() {
 		engine.Send(barPID, message{data: "hi"})
 		time.Sleep(time.Second)
 	}
+	select {}
 }

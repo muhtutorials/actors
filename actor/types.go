@@ -13,7 +13,7 @@ type Remoter interface {
 	Address() string
 }
 
-// Producer is a function that can return a Receiver.
+// Producer is a function that returns a Receiver.
 type Producer func() Receiver
 
 // Receiver (actor) receives and processes messages.

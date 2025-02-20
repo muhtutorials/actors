@@ -13,6 +13,12 @@ import (
 	"sync/atomic"
 )
 
+const (
+	initialized uint32 = iota
+	running
+	stopped
+)
+
 // Config holds remote's configuration.
 type Config struct {
 	TLSConfig *tls.Config
@@ -41,27 +47,20 @@ type Remote struct {
 	stopWG *sync.WaitGroup
 }
 
-const (
-	stateInvalid uint32 = iota
-	stateInitialized
-	stateRunning
-	stateStopped
-)
-
 func New(addr string, cfg Config) *Remote {
 	r := &Remote{
 		addr:   addr,
 		config: cfg,
 	}
-	r.state.Store(stateInitialized)
+	r.state.Store(initialized)
 	return r
 }
 
 func (r *Remote) Start(e *actor.Engine) error {
-	if r.state.Load() != stateInitialized {
+	if r.state.Load() != initialized {
 		return fmt.Errorf("remote already started")
 	}
-	r.state.Store(stateRunning)
+	r.state.Store(running)
 	r.engine = e
 	var (
 		listener net.Listener
@@ -110,11 +109,11 @@ func (r *Remote) Start(e *actor.Engine) error {
 
 // Stop will stop the remote from listening.
 func (r *Remote) Stop() *sync.WaitGroup {
-	if r.state.Load() != stateRunning {
+	if r.state.Load() != running {
 		slog.Warn("remote already stopped but stop has been called", "state", r.state.Load())
 		return &sync.WaitGroup{} // return empty wait group so the caller can still wait without panicking
 	}
-	r.state.Store(stateStopped)
+	r.state.Store(stopped)
 	r.stopCh <- struct{}{}
 	return r.stopWG
 }

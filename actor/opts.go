@@ -35,7 +35,6 @@ func DefaultOpts(p Producer) Opts {
 		MaxRestarts:  defaultMaxRestarts,
 		RestartDelay: defaultRestartDelay,
 		Context:      context.Background(),
-		MiddleWare:   []MiddlewareFunc{},
 	}
 }
 
