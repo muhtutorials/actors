@@ -84,7 +84,7 @@ func (c *Context) Send(pid *PID, msg any) {
 func (c *Context) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
 	r := Repeater{
 		self:     c.pid,
-		target:   pid.CloneVT(),
+		target:   pid,
 		engine:   c.engine,
 		message:  msg,
 		interval: interval,

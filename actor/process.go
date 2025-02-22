@@ -101,6 +101,13 @@ func (p *process) Invoke(msgs []Envelope) {
 		}
 	}()
 	for i := 0; i < nMessages; i++ {
+		// nProcessed is incremented at the top because if some message
+		// causes a panic (restart example), recover function goes into an
+		// infinite loop because it saves the message that caused the panic to the
+		// "messageBuf" which [message] then gets processed again on actor's restart.
+		// So we discard the message by "marking" it as processed
+		// before calling "invokeMessage".
+		nProcessed++
 		msg := msgs[i]
 		if kill, ok := msg.Message.(killProcess); ok {
 			// If we need to stop gracefully, we process all the messages
@@ -115,7 +122,6 @@ func (p *process) Invoke(msgs []Envelope) {
 			return
 		}
 		p.invokeMessage(msg)
-		nProcessed++
 	}
 }
 

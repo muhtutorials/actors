@@ -7,7 +7,8 @@ package remote
 import (
 	context "context"
 	errors "errors"
-	drpc1 "github.com/planetscale/vtprotobuf/codec/drpc"
+	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	drpc "storj.io/drpc"
 	drpcerr "storj.io/drpc/drpcerr"
 )
@@ -15,19 +16,23 @@ import (
 type drpcEncoding_File_remote_remote_proto struct{}
 
 func (drpcEncoding_File_remote_remote_proto) Marshal(msg drpc.Message) ([]byte, error) {
-	return drpc1.Marshal(msg)
+	return proto.Marshal(msg.(proto.Message))
+}
+
+func (drpcEncoding_File_remote_remote_proto) MarshalAppend(buf []byte, msg drpc.Message) ([]byte, error) {
+	return proto.MarshalOptions{}.MarshalAppend(buf, msg.(proto.Message))
 }
 
 func (drpcEncoding_File_remote_remote_proto) Unmarshal(buf []byte, msg drpc.Message) error {
-	return drpc1.Unmarshal(buf, msg)
+	return proto.Unmarshal(buf, msg.(proto.Message))
 }
 
 func (drpcEncoding_File_remote_remote_proto) JSONMarshal(msg drpc.Message) ([]byte, error) {
-	return drpc1.JSONMarshal(msg)
+	return protojson.Marshal(msg.(proto.Message))
 }
 
 func (drpcEncoding_File_remote_remote_proto) JSONUnmarshal(buf []byte, msg drpc.Message) error {
-	return drpc1.JSONUnmarshal(buf, msg)
+	return protojson.Unmarshal(buf, msg.(proto.Message))
 }
 
 type DRPCRemoteClient interface {

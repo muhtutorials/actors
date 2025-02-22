@@ -134,7 +134,3 @@ func (r *Remote) Send(pid *actor.PID, msg any, sender *actor.PID) {
 func (r *Remote) Address() string {
 	return r.addr
 }
-
-func init() {
-	RegisterType(&actor.PID{})
-}

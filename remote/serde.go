@@ -15,16 +15,6 @@ type Deserializer interface {
 	Deserialize([]byte, string) (any, error)
 }
 
-type VTMarshaler interface {
-	proto.Message
-	MarshalVT() ([]byte, error)
-}
-
-type VTUnmarshaler interface {
-	proto.Message
-	UnmarshalVT([]byte) error
-}
-
 type ProtoSerde struct{}
 
 func (ProtoSerde) Serialize(msg any) ([]byte, error) {
@@ -44,24 +34,4 @@ func (ProtoSerde) Deserialize(data []byte, typeName string) (any, error) {
 	protoMessage := messageType.New().Interface()
 	err = proto.Unmarshal(data, protoMessage)
 	return protoMessage, err
-}
-
-// todo: delete if not used
-
-type VTProtoSerde struct{}
-
-func (VTProtoSerde) Serialize(msg any) ([]byte, error) {
-	return msg.(VTMarshaler).MarshalVT()
-}
-
-func (VTProtoSerde) TypeName(msg any) string {
-	return string(proto.MessageName(msg.(proto.Message)))
-}
-
-func (VTProtoSerde) Deserialize(data []byte, typeName string) (any, error) {
-	v, err := GetType(typeName)
-	if err != nil {
-		return nil, err
-	}
-	return v, v.UnmarshalVT(data)
 }

@@ -21,8 +21,8 @@ type streamWriter struct {
 	pid         *actor.PID
 	routerPID   *actor.PID
 	writeToAddr string
-	conn        *drpcconn.Conn
 	rawConn     net.Conn
+	conn        *drpcconn.Conn
 	tlsConfig   *tls.Config
 	stream      DRPCRemote_ReceiveStream
 	serializer  Serializer

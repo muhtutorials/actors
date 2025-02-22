@@ -185,7 +185,6 @@ func (c *Cluster) HasLocalKind(name string) bool {
 func (c *Cluster) Members() []*Member {
 	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
 	if err != nil {
-		// todo: why was "[]*Member{}" here?
 		return nil
 	}
 	if res, ok := resp.([]*Member); ok {

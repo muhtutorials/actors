@@ -164,7 +164,7 @@ func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
 func (e *Engine) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
 	r := Repeater{
 		self:     nil,
-		target:   pid.CloneVT(),
+		target:   pid,
 		engine:   e,
 		message:  msg,
 		interval: interval,
