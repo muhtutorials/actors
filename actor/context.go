@@ -55,7 +55,7 @@ func (c *Context) SpawnChild(p Producer, name string, optFns ...OptFunc) *PID {
 	for _, fn := range optFns {
 		fn(&opts)
 	}
-	// check if we got an ID, generate otherwise
+	// check if we got an ID, generate one otherwise
 	if opts.ID == "" {
 		opts.ID = strconv.Itoa(rand.Intn(math.MaxInt))
 	}
@@ -100,9 +100,9 @@ func (c *Context) Forward(pid *PID) {
 	c.engine.SendWithSender(pid, c.message, c.pid)
 }
 
-// GetProcessPID returns the PID of the process found by the id.
-// Returns nil when it could not find any process.
-func (c *Context) GetProcessPID(id string) *PID {
+// GetProcess returns the PID by ID.
+// If there wasn't found any process, nil is returned.
+func (c *Context) GetProcess(id string) *PID {
 	proc, err := c.engine.Processes.Get(id)
 	if err != nil {
 		return nil
@@ -158,4 +158,11 @@ func (c *Context) Children() []*PID {
 		i++
 	})
 	return pids
+}
+
+// Child returns the PID of the child by the given ID.
+// nil is returned if the child wasn't found.
+func (c *Context) Child(id string) *PID {
+	pid, _ := c.children.Get(id)
+	return pid
 }

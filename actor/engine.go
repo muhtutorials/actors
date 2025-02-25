@@ -60,7 +60,7 @@ func (e *Engine) Spawn(p Producer, kind string, optFns ...OptFunc) *PID {
 	for _, fn := range optFns {
 		fn(&opts)
 	}
-	// check if we got an ID, generate otherwise
+	// check if we got an ID, generate one otherwise
 	if opts.ID == "" {
 		opts.ID = strconv.Itoa(rand.Intn(math.MaxInt))
 	}
