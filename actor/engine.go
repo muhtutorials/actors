@@ -86,17 +86,17 @@ func (e *Engine) SpawnProcess(proc Processor) *PID {
 	return pid
 }
 
-// SendWithSender will send the given message to the given PID with the
-// given sender. Receivers can check the sender by calling Context.Sender().
-func (e *Engine) SendWithSender(pid *PID, msg any, sender *PID) {
-	e.send(pid, msg, sender)
-}
-
 // Send sends the given message to the given PID. If the message cannot be
 // delivered due to the fact that the given process is not registered
 // the message will be sent to the DeadLetter process instead.
 func (e *Engine) Send(pid *PID, msg any) {
 	e.send(pid, msg, nil)
+}
+
+// SendWithSender will send the given message to the given PID with the
+// given sender. Receivers can check the sender by calling Context.Sender method.
+func (e *Engine) SendWithSender(pid *PID, msg any, sender *PID) {
+	e.send(pid, msg, sender)
 }
 
 func (e *Engine) send(pid *PID, msg any, sender *PID) {
@@ -105,7 +105,7 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	}
 	// check if it's a local message
 	if e.address == pid.Address {
-		e.SendLocal(pid, msg, sender)
+		e.SendLocally(pid, msg, sender)
 		return
 	}
 	if e.remote == nil {
@@ -115,9 +115,9 @@ func (e *Engine) send(pid *PID, msg any, sender *PID) {
 	e.remote.Send(pid, msg, sender)
 }
 
-// SendLocal will send the given message to the given PID. If the recipient is not in the
-// "Processes", the message will broadcast as a "DeadLetterEvent".
-func (e *Engine) SendLocal(pid *PID, msg any, sender *PID) {
+// SendLocally will send the given message to the given PID. If the recipient is not in the
+// "Processes", the message will be broadcast as a "DeadLetterEvent".
+func (e *Engine) SendLocally(pid *PID, msg any, sender *PID) {
 	proc, err := e.Processes.Get(pid.ID)
 	if err != nil {
 		e.BroadcastEvent(DeadLetterEvent{
@@ -159,15 +159,23 @@ func (e *Engine) Request(pid *PID, msg any, timeout time.Duration) *Response {
 }
 
 // Repeat will send a message to a PID at a provided interval.
-// It will return a "Repeater" that can be used to stop
-// the repeated sending of the message by calling "Stop".
-func (e *Engine) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
+// It will return a "Repeater" that can be used to stop it by calling Stop method.
+func (e *Engine) Repeat(target *PID, msg any, interval time.Duration) Repeater {
+	return e.repeat(target, msg, nil, interval)
+}
+
+// RepeatWithSender does the same thing as Repeat method only with sender specified.
+func (e *Engine) RepeatWithSender(target *PID, msg any, sender *PID, interval time.Duration) Repeater {
+	return e.repeat(target, msg, sender, interval)
+}
+
+func (e *Engine) repeat(pid *PID, msg any, sender *PID, interval time.Duration) Repeater {
 	r := Repeater{
-		self:     nil,
 		target:   pid,
-		engine:   e,
 		message:  msg,
+		sender:   sender,
 		interval: interval,
+		engine:   e,
 		cancelCh: make(chan struct{}, 1),
 	}
 	r.Start()
@@ -176,11 +184,11 @@ func (e *Engine) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
 
 // Repeater is used to send a message at an interval to a given PID.
 type Repeater struct {
-	self     *PID
 	target   *PID
-	engine   *Engine
 	message  any
+	sender   *PID
 	interval time.Duration
+	engine   *Engine
 	cancelCh chan struct{}
 }
 
@@ -190,7 +198,7 @@ func (r Repeater) Start() {
 		for {
 			select {
 			case <-ticker.C:
-				r.engine.SendWithSender(r.target, r.message, r.self)
+				r.engine.SendWithSender(r.target, r.message, r.sender)
 			case <-r.cancelCh:
 				ticker.Stop()
 				return
@@ -239,7 +247,7 @@ func (e *Engine) sendKillProcess(ctx context.Context, pid *PID, graceful bool) c
 		cancel()
 		return ctx
 	}
-	e.SendLocal(pid, kill, nil)
+	e.SendLocally(pid, kill, nil)
 	return ctx
 }
 

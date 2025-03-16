@@ -43,7 +43,7 @@ func (r *streamReader) Receive(stream DRPCRemote_ReceiveStream) error {
 			if len(envelope.Senders) > 0 {
 				sender = envelope.Senders[msg.SenderIndex]
 			}
-			r.remote.engine.SendLocal(target, payload, sender)
+			r.remote.engine.SendLocally(target, payload, sender)
 		}
 	}
 	return nil

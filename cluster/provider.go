@@ -40,8 +40,8 @@ func (c ProviderConfig) WithBootstrapMembers(members ...MemberAddr) ProviderConf
 
 type Provider struct {
 	config       ProviderConfig
-	cluster      *Cluster
 	pid          *actor.PID
+	cluster      *Cluster
 	members      *MemberSet
 	membersAlive *MemberSet
 	memberPinger actor.Repeater
@@ -80,6 +80,7 @@ func (p *Provider) Receive(ctx *actor.Context) {
 	case MemberPing:
 		p.handleMemberPing(ctx)
 	case *actor.Ping:
+		// todo: handle "Ping" message
 	case actor.Initialized:
 	default:
 		slog.Warn("received unhandled message", "msg", msg, "type", reflect.TypeOf(msg))
@@ -89,7 +90,7 @@ func (p *Provider) Receive(ctx *actor.Context) {
 func (p *Provider) handleActorStarted(ctx *actor.Context) {
 	p.pid = ctx.PID()
 	p.members.Add(p.cluster.Member())
-	p.memberPinger = ctx.Repeat(ctx.PID(), MemberPing{}, memberPingInterval)
+	p.memberPinger = ctx.Engine().Repeat(ctx.PID(), MemberPing{}, memberPingInterval)
 	p.context, p.cancel = context.WithCancel(context.Background())
 	p.sendMembersToAgent()
 	p.start(ctx)

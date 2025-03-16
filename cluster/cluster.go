@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Pick a reasonable timeout so nodes of long distance networks (should) work.
+// Should be a reasonable timeout so long distance nodes could work.
 var defaultRequestTimeout = time.Second
 
 // Producer is a function that produces an actor.Producer.
@@ -134,6 +134,32 @@ func (c *Cluster) Spawn(p actor.Producer, id string, optFns ...actor.OptFunc) *a
 	return pid
 }
 
+// Member returns the member info of the cluster.
+func (c *Cluster) Member() *Member {
+	kinds := make([]string, len(c.kinds))
+	for i := 0; i < len(c.kinds); i++ {
+		kinds[i] = c.kinds[i].name
+	}
+	return &Member{
+		Address: c.engine.Address(),
+		ID:      c.config.id,
+		Region:  c.config.region,
+		Kinds:   kinds,
+	}
+}
+
+// Members returns all the members that are part of the cluster.
+func (c *Cluster) Members() []*Member {
+	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
+	if err != nil {
+		return nil
+	}
+	if res, ok := resp.([]*Member); ok {
+		return res
+	}
+	return nil
+}
+
 // Activate activates the registered kind in the cluster based on the given config.
 // The actor does not need to be registered locally on the member if at least one
 // member has that kind registered.
@@ -160,6 +186,17 @@ func (c *Cluster) Deactivate(pid *actor.PID) {
 	c.engine.Send(c.agentPID, Deactivate{PID: pid})
 }
 
+func (c *Cluster) GetActivated(id string) *actor.PID {
+	resp, err := c.engine.Request(c.agentPID, GetActive{ID: id}, c.config.requestTimeout).Result()
+	if err != nil {
+		return nil
+	}
+	if res, ok := resp.(*actor.PID); ok {
+		return res
+	}
+	return nil
+}
+
 // RegisterKind registers a new actor that can be activated from
 // any member in the cluster.
 // NOTE: Kinds can only be registered before the cluster is started.
@@ -181,18 +218,6 @@ func (c *Cluster) HasLocalKind(name string) bool {
 	return false
 }
 
-// Members returns all the members that are part of the cluster.
-func (c *Cluster) Members() []*Member {
-	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
-	if err != nil {
-		return nil
-	}
-	if res, ok := resp.([]*Member); ok {
-		return res
-	}
-	return nil
-}
-
 // HasKind returns true whether the given kind is available for activation on
 // the cluster.
 func (c *Cluster) HasKind(name string) bool {
@@ -210,29 +235,14 @@ func (c *Cluster) HasKind(name string) bool {
 	return false
 }
 
-func (c *Cluster) GetActivated(id string) *actor.PID {
-	resp, err := c.engine.Request(c.agentPID, GetActive{ID: id}, c.config.requestTimeout).Result()
-	if err != nil {
-		return nil
-	}
-	if res, ok := resp.(*actor.PID); ok {
-		return res
-	}
-	return nil
+// ID returns the ID of the cluster.
+func (c *Cluster) ID() string {
+	return c.config.id
 }
 
-// Member returns the member info of the cluster.
-func (c *Cluster) Member() *Member {
-	kinds := make([]string, len(c.kinds))
-	for i := 0; i < len(c.kinds); i++ {
-		kinds[i] = c.kinds[i].name
-	}
-	return &Member{
-		Address: c.engine.Address(),
-		ID:      c.config.id,
-		Region:  c.config.region,
-		Kinds:   kinds,
-	}
+// Region return the region of the cluster.
+func (c *Cluster) Region() string {
+	return c.config.region
 }
 
 // Engine returns the actor engine.
@@ -248,16 +258,6 @@ func (c *Cluster) PID() *actor.PID {
 // Address returns the address of the cluster.
 func (c *Cluster) Address() string {
 	return c.agentPID.Address
-}
-
-// ID returns the ID of the cluster.
-func (c *Cluster) ID() string {
-	return c.config.id
-}
-
-// Region return the region of the cluster.
-func (c *Cluster) Region() string {
-	return c.config.region
 }
 
 func getRandomListenAddr() string {

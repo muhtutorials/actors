@@ -78,22 +78,6 @@ func (c *Context) Send(pid *PID, msg any) {
 	c.engine.SendWithSender(pid, msg, c.pid)
 }
 
-// Repeat will send a message to a PID at a provided interval.
-// It will return a "Repeater" that can be used to stop
-// the repeated sending of the message by calling "Stop".
-func (c *Context) Repeat(pid *PID, msg any, interval time.Duration) Repeater {
-	r := Repeater{
-		self:     c.pid,
-		target:   pid,
-		engine:   c.engine,
-		message:  msg,
-		interval: interval,
-		cancelCh: make(chan struct{}, 1),
-	}
-	r.Start()
-	return r
-}
-
 // Forward will forward the current received message to the PID.
 // This will also set the "forwarder" as the sender of the message.
 func (c *Context) Forward(pid *PID) {
