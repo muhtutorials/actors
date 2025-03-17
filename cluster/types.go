@@ -12,7 +12,7 @@ type (
 		PID *actor.PID
 	}
 
-	GetActive struct {
+	GetActivated struct {
 		ID string
 	}
 

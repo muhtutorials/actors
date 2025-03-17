@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	serviceName        = "_actor_"
+	serviceName        = "_actor"
 	domain             = "local."
 	memberPingInterval = time.Second * 2
 )
@@ -33,16 +33,17 @@ func NewProviderConfig() ProviderConfig {
 	return ProviderConfig{}
 }
 
-func (c ProviderConfig) WithBootstrapMembers(members ...MemberAddr) ProviderConfig {
-	c.bootstrapMembers = append(c.bootstrapMembers, members...)
-	return c
+func (cfg ProviderConfig) WithBootstrapMembers(members ...MemberAddr) ProviderConfig {
+	cfg.bootstrapMembers = append(cfg.bootstrapMembers, members...)
+	return cfg
 }
 
 type Provider struct {
-	config       ProviderConfig
-	pid          *actor.PID
-	cluster      *Cluster
-	members      *MemberSet
+	config  ProviderConfig
+	pid     *actor.PID
+	cluster *Cluster
+	members *MemberSet
+	// todo: not used yet
 	membersAlive *MemberSet
 	memberPinger actor.Repeater
 	eventPID     *actor.PID
@@ -210,9 +211,9 @@ func (p *Provider) handleServiceEntries(results <-chan *zeroconf.ServiceEntry) {
 	for entry := range results {
 		if entry.Instance != p.cluster.ID() {
 			addr := fmt.Sprintf("%s:%d", entry.AddrIPv4[0], entry.Port)
-			hs := &Handshake{Member: p.cluster.Member()}
 			// create a reachable PID for this member
 			memberPID := actor.NewPID(addr, "provider/"+entry.Instance)
+			hs := &Handshake{Member: p.cluster.Member()}
 			self := actor.NewPID(p.cluster.agentPID.Address, "provider/"+p.cluster.ID())
 			p.cluster.engine.SendWithSender(memberPID, hs, self)
 		}

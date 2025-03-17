@@ -77,7 +77,7 @@ func (cfg Config) WithProvider(p Producer) Config {
 
 // WithRequestTimeout sets the maximum amount of time a request
 // can take between members of the cluster.
-// Defaults to 1 second to support communication between nodes in
+// Defaults to one second to support communication between nodes in
 // other regions.
 func (cfg Config) WithRequestTimeout(d time.Duration) Config {
 	cfg.requestTimeout = d
@@ -106,10 +106,7 @@ func New(cfg Config) (*Cluster, error) {
 		}
 		cfg.engine = engine
 	}
-	return &Cluster{
-		config: cfg,
-		engine: cfg.engine,
-	}, nil
+	return &Cluster{config: cfg, engine: cfg.engine}, nil
 }
 
 // Start the cluster.
@@ -123,6 +120,7 @@ func (c *Cluster) Start() {
 func (c *Cluster) Stop() {
 	<-c.engine.Kill(c.agentPID).Done()
 	<-c.engine.Kill(c.providerPID).Done()
+	// todo: should "c.isStarted" be set to false?
 }
 
 // Spawn spawns an actor locally with cluster awareness.
@@ -132,6 +130,18 @@ func (c *Cluster) Spawn(p actor.Producer, id string, optFns ...actor.OptFunc) *a
 		c.engine.Send(member.PID(), &Activation{PID: pid})
 	}
 	return pid
+}
+
+// Members returns all the members that are part of the cluster.
+func (c *Cluster) Members() []*Member {
+	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
+	if err != nil {
+		return nil
+	}
+	if res, ok := resp.([]*Member); ok {
+		return res
+	}
+	return nil
 }
 
 // Member returns the member info of the cluster.
@@ -148,20 +158,8 @@ func (c *Cluster) Member() *Member {
 	}
 }
 
-// Members returns all the members that are part of the cluster.
-func (c *Cluster) Members() []*Member {
-	resp, err := c.engine.Request(c.agentPID, GetMembers{}, c.config.requestTimeout).Result()
-	if err != nil {
-		return nil
-	}
-	if res, ok := resp.([]*Member); ok {
-		return res
-	}
-	return nil
-}
-
 // Activate activates the registered kind in the cluster based on the given config.
-// The actor does not need to be registered locally on the member if at least one
+// The actor does not need to be registered locally if at least one
 // member has that kind registered.
 func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
 	msg := Activate{
@@ -175,7 +173,7 @@ func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
 	}
 	pid, ok := resp.(*actor.PID)
 	if !ok {
-		slog.Warn("activation expected response of '*actor.PID'", "got", reflect.TypeOf(resp))
+		slog.Warn("expected activation response of '*actor.PID'", "got", reflect.TypeOf(resp))
 		return nil
 	}
 	return pid
@@ -186,13 +184,14 @@ func (c *Cluster) Deactivate(pid *actor.PID) {
 	c.engine.Send(c.agentPID, Deactivate{PID: pid})
 }
 
+// GetActivated gets the activated actor
 func (c *Cluster) GetActivated(id string) *actor.PID {
-	resp, err := c.engine.Request(c.agentPID, GetActive{ID: id}, c.config.requestTimeout).Result()
+	resp, err := c.engine.Request(c.agentPID, GetActivated{ID: id}, c.config.requestTimeout).Result()
 	if err != nil {
 		return nil
 	}
-	if res, ok := resp.(*actor.PID); ok {
-		return res
+	if pid, ok := resp.(*actor.PID); ok {
+		return pid
 	}
 	return nil
 }

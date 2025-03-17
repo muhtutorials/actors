@@ -51,7 +51,7 @@ func (a *Agent) Receive(ctx *actor.Context) {
 		ctx.Respond(pid)
 	case Deactivate:
 		a.broadcast(&Deactivation{PID: msg.PID})
-	case GetActive:
+	case GetActivated:
 		pid := a.activated[msg.ID]
 		ctx.Respond(pid)
 	case GetKinds:
@@ -117,7 +117,7 @@ func (a *Agent) activate(cfg ActivationConfig, kind string) *actor.PID {
 		Members: members,
 	})
 	if selectedMember == nil {
-		slog.Warn("activator did not find a member to activate on")
+		slog.Warn("activator did not find a member to activate")
 		return nil
 	}
 	req := &ActivationRequest{ID: cfg.id, Kind: kind}

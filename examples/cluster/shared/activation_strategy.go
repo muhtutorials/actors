@@ -13,13 +13,13 @@ func NewRegionBasedActivationStrategy(fallback string) RegionBasedActivationStra
 	return RegionBasedActivationStrategy{fallback: fallback}
 }
 
-func (as *RegionBasedActivationStrategy) ActivateOnMember(details cluster.ActivationDetails) *cluster.Member {
+func (s *RegionBasedActivationStrategy) ActivateOnMember(details cluster.ActivationDetails) *cluster.Member {
 	members := filterMembersByRegion(details.Members, details.Region)
 	if len(members) > 0 {
 		return members[rand.Intn(len(members))]
 	}
 	// if we could not find a member for the region, try to fall back.
-	members = filterMembersByRegion(details.Members, as.fallback)
+	members = filterMembersByRegion(details.Members, s.fallback)
 	if len(members) > 0 {
 		return members[rand.Intn(len(members))]
 	}

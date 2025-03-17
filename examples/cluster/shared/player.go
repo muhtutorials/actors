@@ -14,7 +14,6 @@ func NewPlayer() actor.Receiver {
 
 func (p *Player) Receive(ctx *actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case actor.Started:
 	case *remote.TestMessage:
 		fmt.Println("test message:", string(msg.Data))
 	}
