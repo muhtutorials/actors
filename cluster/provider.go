@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	serviceName        = "_actor"
-	domain             = "local."
-	memberPingInterval = time.Second * 2
+	serviceName         = "_actor"
+	domain              = "local."
+	membersPingInterval = time.Second * 2
 )
 
 // MemberAddr represents a reachable member in the cluster.
@@ -78,8 +78,8 @@ func (p *Provider) Receive(ctx *actor.Context) {
 		p.addMembers(msg.Members...)
 	case MemberLeft:
 		p.handleMemberLeft(msg)
-	case MemberPing:
-		p.handleMemberPing(ctx)
+	case PingMembers:
+		p.handlePingMembers(ctx)
 	case *actor.Ping:
 		// todo: handle "Ping" message
 	case actor.Initialized:
@@ -91,7 +91,7 @@ func (p *Provider) Receive(ctx *actor.Context) {
 func (p *Provider) handleActorStarted(ctx *actor.Context) {
 	p.pid = ctx.PID()
 	p.members.Add(p.cluster.Member())
-	p.memberPinger = ctx.Engine().Repeat(ctx.PID(), MemberPing{}, memberPingInterval)
+	p.memberPinger = ctx.Engine().Repeat(ctx.PID(), PingMembers{}, membersPingInterval)
 	p.context, p.cancel = context.WithCancel(context.Background())
 	p.sendMembersToAgent()
 	p.start(ctx)
@@ -115,7 +115,7 @@ func (p *Provider) handleMemberLeft(msg MemberLeft) {
 	p.removeMember(member)
 }
 
-func (p *Provider) handleMemberPing(ctx *actor.Context) {
+func (p *Provider) handlePingMembers(ctx *actor.Context) {
 	p.members.ForEach(func(member *Member) bool {
 		if member.Address != p.cluster.agentPID.Address {
 			ping := &actor.Ping{From: ctx.PID()}

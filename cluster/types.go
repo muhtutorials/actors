@@ -20,11 +20,11 @@ type (
 
 	GetMembers struct{}
 
+	PingMembers struct{}
+
 	MemberLeft struct {
 		ListenAddr string
 	}
-
-	MemberPing struct{}
 
 	// MemberJoinedEvent gets triggered each time a new member joins the cluster.
 	MemberJoinedEvent struct {

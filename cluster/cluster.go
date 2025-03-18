@@ -138,8 +138,8 @@ func (c *Cluster) Members() []*Member {
 	if err != nil {
 		return nil
 	}
-	if res, ok := resp.([]*Member); ok {
-		return res
+	if members, ok := resp.([]*Member); ok {
+		return members
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func (c *Cluster) Member() *Member {
 }
 
 // Activate activates the registered kind in the cluster based on the given config.
-// The actor does not need to be registered locally if at least one
+// The actor does not need to be registered locally on the member if at least one
 // member has that kind registered.
 func (c *Cluster) Activate(cfg ActivationConfig, kind string) *actor.PID {
 	msg := Activate{

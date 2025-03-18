@@ -77,6 +77,8 @@ func (s *MemberSet) FilterByKind(kind string) []*Member {
 }
 
 // Difference calculates the difference of sets "s.members" and "members".
+// Returns a slice of elements which are present in "s.members" and not in "members",
+// that is, unique to "s.members".
 func (s *MemberSet) Difference(members []*Member) []*Member {
 	var (
 		m    = make(map[string]*Member)
